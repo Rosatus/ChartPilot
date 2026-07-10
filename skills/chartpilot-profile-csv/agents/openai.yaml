@@ -1,0 +1,4 @@
+interface:
+  display_name: "ChartPilot CSV Profiler"
+  short_description: "Profile local CSV files with auditable quality checks"
+  default_prompt: "Use $chartpilot-profile-csv to inspect this local CSV and write input_profile.json."

@@ -1,0 +1,41 @@
+# Local Agent planning and maintainer notes
+task_plan.md
+findings.md
+progress.md
+.planning/
+.local/
+LOCAL_DEVELOPMENT.md
+MAINTAINER_NOTES.md
+
+# Python
+__pycache__/
+*.py[cod]
+*.pyd
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# Virtual environments and secrets
+.venv/
+venv/
+env/
+.env
+.env.*
+!.env.example
+
+# Runtime and build outputs
+workspace/
+output/
+build/
+dist/
+wheelhouse/
+*.egg-info/
+*.log
+
+# Editors and operating systems
+.idea/
+.vscode/
+.DS_Store
+Thumbs.db

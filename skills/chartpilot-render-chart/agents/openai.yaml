@@ -1,0 +1,4 @@
+interface:
+  display_name: "ChartPilot Chart Renderer"
+  short_description: "Render verified charts from frozen analysis results"
+  default_prompt: "Use $chartpilot-render-chart to render and validate a chart from this successful ChartPilot analysis result."
