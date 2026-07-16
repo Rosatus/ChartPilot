@@ -13,7 +13,7 @@
 ## Command line
 
 ```text
-python scripts/run_analysis.py \
+<chartpilot-root>\runtime\winpython\python\python.exe -I <chartpilot-root>\skills\chartpilot-analyze-data\scripts\run_analysis.py \
   --profile PATH_TO_INPUT_PROFILE_JSON \
   --plan PATH_TO_ANALYSIS_PLAN_JSON \
   --output-dir TASK_DIRECTORY \
@@ -24,6 +24,9 @@ python scripts/run_analysis.py \
   [--no-overwrite] \
   [--allow-unc]
 ```
+
+Resolve the interpreter through the `chartpilot-run-python` contract. Invoke it directly with a
+process argument array and never fall back to a system Python interpreter.
 
 All paths support Unicode and spaces. Pass arguments as a process argument array. `--allowed-read-root` is repeatable and `--allowed-write-root` accepts one trusted deployment root. If the deployment omits these policy options, the explicitly supplied files and output directory are treated as authorized by the caller.
 

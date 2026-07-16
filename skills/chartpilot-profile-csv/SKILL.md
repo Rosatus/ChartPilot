@@ -9,10 +9,11 @@ Use the bundled deterministic script for all file reading and factual profiling.
 
 ## Run the profiler
 
-Invoke `scripts/profile_csv.py` with the local CSV path and task output directory:
+Use `chartpilot-run-python` to resolve and validate the bundled interpreter. Invoke the profiler
+with the local CSV path and task output directory:
 
 ```text
-python scripts/profile_csv.py "C:\data\sales.csv" --task-id T001 --output-dir "C:\ChartPilot\workspace\tasks\T001"
+<chartpilot-root>\runtime\winpython\python\python.exe -I <chartpilot-root>\skills\chartpilot-profile-csv\scripts\profile_csv.py "C:\data\sales.csv" --task-id T001 --output-dir "C:\ChartPilot\workspace\tasks\T001"
 ```
 
 Pass arguments as a process argument array, never as a shell-composed command. Set `--allowed-read-root` and `--allowed-write-root` when the runtime supplies controlled workspace roots. Let the caller enforce the process timeout.
@@ -47,4 +48,5 @@ Pass `input_profile.json` to the analysis Skill. Its local `source.path` and `so
 - Reject format ambiguity instead of guessing.
 - Preserve existing complete output until a replacement profile has been fully written and atomically installed.
 - Never invoke network clients, generated Python, subprocesses, `eval`, or `exec` from this Skill.
+- Never fall back to a system Python interpreter or install dependencies at runtime.
 - Stop after profiling. Delegate cleaning and computation to the analysis Skill and visualization to the charting Skill.

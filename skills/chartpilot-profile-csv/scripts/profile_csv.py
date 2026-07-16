@@ -314,12 +314,12 @@ def build_parser() -> StructuredArgumentParser:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog=(
             "Examples:\n"
-            "  python profile_csv.py sales.csv --task-id T001 --output-dir task-output\n"
-            "  python profile_csv.py \"C:\\数据\\销售 2026.csv\" --task-id T001 "
+            "  <bundled-python> profile_csv.py sales.csv --task-id T001 --output-dir task-output\n"
+            "  <bundled-python> profile_csv.py \"C:\\数据\\销售 2026.csv\" --task-id T001 "
             "--output-dir \"C:\\ChartPilot\\workspace\\tasks\\T001\" "
             "--allowed-read-root \"C:\\数据\" "
             "--allowed-write-root \"C:\\ChartPilot\\workspace\"\n"
-            "  python profile_csv.py data.csv --task-id T002 --output-dir out "
+            "  <bundled-python> profile_csv.py data.csv --task-id T002 --output-dir out "
             "--encoding gbk --delimiter semicolon --sample-mode none"
         ),
     )

@@ -27,10 +27,11 @@ Return `UNSUPPORTED_OPERATION` when the request cannot be represented by the con
 
 ## Run the analysis
 
-Invoke the script with process arguments rather than a shell-composed command:
+Use `chartpilot-run-python` to resolve and validate the bundled interpreter. Invoke the script
+with process arguments rather than a shell-composed command:
 
 ```text
-python scripts/run_analysis.py --profile "C:\ChartPilot\workspace\tasks\T001\input_profile.json" --plan "C:\ChartPilot\workspace\tasks\T001\analysis_plan.json" --output-dir "C:\ChartPilot\workspace\tasks\T001" --allowed-read-root "C:\ChartPilot\workspace" --allowed-read-root "C:\data" --allowed-write-root "C:\ChartPilot\workspace"
+<chartpilot-root>\runtime\winpython\python\python.exe -I <chartpilot-root>\skills\chartpilot-analyze-data\scripts\run_analysis.py --profile "C:\ChartPilot\workspace\tasks\T001\input_profile.json" --plan "C:\ChartPilot\workspace\tasks\T001\analysis_plan.json" --output-dir "C:\ChartPilot\workspace\tasks\T001" --allowed-read-root "C:\ChartPilot\workspace" --allowed-read-root "C:\data" --allowed-write-root "C:\ChartPilot\workspace"
 ```
 
 Let the Agent runtime impose a process timeout and Windows resource limits. Supply trusted read and write roots from deployment configuration; never derive them from model output. Treat a zero exit code and `analysis_result.json` with `status: success` as the only successful completion signal.
@@ -57,4 +58,5 @@ Retry only after changing the identified cause and respect the runtime retry cap
 - Write only `generated_analysis.py`, optional `cleaned_data.csv`, `result.csv`, and `analysis_result.json` under the requested output directory.
 - Keep `generated_analysis.py` as a deterministic, human-readable compilation record; execute calculations through the allowlisted runner.
 - Keep API keys, raw rows, and cell values out of logs and error details.
+- Never fall back to a system Python interpreter or install dependencies at runtime.
 - Stop after analysis. Delegate all PNG, font, layout, and Base64 work to `chartpilot-render-chart`.

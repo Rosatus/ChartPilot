@@ -197,7 +197,7 @@ Do not overwrite a prior successful artifact set when validation fails before co
 ## 8. CLI Contract
 
 ```text
-python render_chart.py --analysis-result PATH [options]
+<chartpilot-root>\runtime\winpython\python\python.exe -I <chartpilot-root>\skills\chartpilot-render-chart\scripts\render_chart.py --analysis-result PATH [options]
 
 required:
   --analysis-result PATH
@@ -213,6 +213,9 @@ options:
   --max-points INTEGER
   --debug
 ```
+
+Resolve the interpreter through the `chartpilot-run-python` contract. Invoke it directly with a
+process argument array and never fall back to a system Python interpreter.
 
 Make `--help` work even when pandas, Matplotlib, or Pillow is not installed. On success, write one JSON object to stdout and return exit code `0`.
 

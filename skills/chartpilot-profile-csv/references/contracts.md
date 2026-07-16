@@ -3,10 +3,13 @@
 ## Command line
 
 ```text
-python scripts/profile_csv.py INPUT --task-id TASK_ID --output-dir DIRECTORY [OPTIONS]
+<chartpilot-root>\runtime\winpython\python\python.exe -I <chartpilot-root>\skills\chartpilot-profile-csv\scripts\profile_csv.py INPUT --task-id TASK_ID --output-dir DIRECTORY [OPTIONS]
 ```
 
 `INPUT` must be one regular local file. The command always writes `DIRECTORY/input_profile.json`; callers cannot choose another output filename.
+
+Resolve the interpreter through the `chartpilot-run-python` contract. Invoke it directly with a
+process argument array and never fall back to a system Python interpreter.
 
 Core options:
 

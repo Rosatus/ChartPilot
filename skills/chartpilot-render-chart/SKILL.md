@@ -11,12 +11,11 @@ Render only the frozen analysis result. Treat the analysis manifest and its hash
 
 1. Read [references/contracts.md](references/contracts.md) completely before the first render in a task.
 2. Confirm that `analysis_result.json` has schema `chartpilot.analysis-result/v1`, stage `analysis`, and status `success`.
-3. Invoke the bundled renderer with quoted paths:
+3. Use `chartpilot-run-python` to resolve and validate the bundled interpreter, then invoke the
+   renderer with separate process arguments:
 
-```bash
-python scripts/render_chart.py \
-  --analysis-result "<task-dir>/analysis_result.json" \
-  --output-dir "<task-dir>"
+```text
+<chartpilot-root>\runtime\winpython\python\python.exe -I <chartpilot-root>\skills\chartpilot-render-chart\scripts\render_chart.py --analysis-result "<task-dir>\analysis_result.json" --output-dir "<task-dir>"
 ```
 
 4. Pass `--font-path "<font-file>"` when the chart contains Chinese text and automatic Windows font discovery cannot find a CJK font.
@@ -28,6 +27,7 @@ python scripts/render_chart.py \
 - Read the CSV path only from `artifacts.result_csv.path` in `analysis_result.json`.
 - Require a relative path named `result.csv`, resolve it beneath the manifest directory, and verify its declared SHA-256 before parsing it.
 - Never inspect `source.path`, `cleaned_data.csv`, the original CSV, or any other tabular file.
+- Never fall back to a system Python interpreter or install dependencies at runtime.
 - Never group, aggregate, calculate Top N, fill missing values, drop rows, derive shares, or alter business values.
 - Require plot-ready distribution results. Reject raw observations presented as a distribution request.
 - Use `findings[].text` verbatim as the analytical content of `summary.md`; do not invent new numerical conclusions.
