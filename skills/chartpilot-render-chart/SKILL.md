@@ -11,16 +11,20 @@ Render only the frozen analysis result. Treat the analysis manifest and its hash
 
 1. Read [references/contracts.md](references/contracts.md) completely before the first render in a task.
 2. Confirm that `analysis_result.json` has schema `chartpilot.analysis-result/v1`, stage `analysis`, and status `success`.
-3. Use `chartpilot-run-python` to resolve and validate the bundled interpreter, then invoke the
-   renderer with separate process arguments:
+3. When hosted by the portable Goose base, call the `chartpilot_render_chart` MCP tool with the
+   task ID and optional trusted `font_path`. Do not use Goose's generic Developer extension or
+   shell. Treat the returned manifest, summary, PNG path, and PNG SHA-256 as the result.
+4. Use the direct CLI form below only for diagnostics or a non-Goose caller. Resolve the
+   bundled interpreter with `chartpilot-run-python`, then invoke the renderer with separate
+   process arguments:
 
 ```text
 <chartpilot-root>\runtime\winpython\python\python.exe -I <chartpilot-root>\skills\chartpilot-render-chart\scripts\render_chart.py --analysis-result "<task-dir>\analysis_result.json" --output-dir "<task-dir>"
 ```
 
-4. Pass `--font-path "<font-file>"` when the chart contains Chinese text and automatic Windows font discovery cannot find a CJK font.
-5. Treat exit code `0` and `chart_result.json` with `status: success` as the only successful outcome.
-6. Return `chart.png`, `summary.md`, `chart_spec.json`, `generated_chart.py`, and `chart_result.json` to the calling workflow.
+5. Pass `--font-path "<font-file>"` when the chart contains Chinese text and automatic Windows font discovery cannot find a CJK font.
+6. Treat exit code `0` and `chart_result.json` with `status: success` as the only successful outcome.
+7. Return `chart.png`, `summary.md`, `chart_spec.json`, `generated_chart.py`, and `chart_result.json` to the calling workflow.
 
 ## Preserve The Data Boundary
 

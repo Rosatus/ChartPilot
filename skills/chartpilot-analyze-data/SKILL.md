@@ -27,7 +27,13 @@ Return `UNSUPPORTED_OPERATION` when the request cannot be represented by the con
 
 ## Run the analysis
 
-Use `chartpilot-run-python` to resolve and validate the bundled interpreter. Invoke the script
+When hosted by the portable Goose base, call the `chartpilot_analyze_data` MCP tool with the
+profile task ID and complete `analysis_plan` JSON object. Do not use Goose's generic Developer
+extension, shell, or arbitrary Python. The bridge writes the plan beneath the trusted task
+directory and invokes the deterministic runner.
+
+Use the direct CLI form below only for diagnostics or a non-Goose caller. Use
+`chartpilot-run-python` to resolve and validate the bundled interpreter. Invoke the script
 with process arguments rather than a shell-composed command:
 
 ```text

@@ -9,7 +9,12 @@ Use the bundled deterministic script for all file reading and factual profiling.
 
 ## Run the profiler
 
-Use `chartpilot-run-python` to resolve and validate the bundled interpreter. Invoke the profiler
+When hosted by the portable Goose base, call the `chartpilot_profile_csv` MCP tool with the
+local `source_path`, optional stable `task_id`, and disclosure-safe `sample_mode`. Do not use
+Goose's generic Developer extension or shell. Keep the returned task ID for downstream calls.
+
+Use the direct CLI form below only for diagnostics or a non-Goose caller. Use
+`chartpilot-run-python` to resolve and validate the bundled interpreter. Invoke the profiler
 with the local CSV path and task output directory:
 
 ```text

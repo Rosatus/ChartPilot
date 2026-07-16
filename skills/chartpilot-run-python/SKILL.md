@@ -24,12 +24,16 @@ Agent launcher, authoring generated code, handling runtime errors, or recording 
 
 ## Choose the execution path
 
+- In the portable Goose base, use the named `chartpilot_profile_csv`,
+  `chartpilot_analyze_data`, and `chartpilot_render_chart` MCP tools for the standard workflow.
+  The default ChartPilot MCP surface deliberately exposes neither arbitrary Python nor a shell.
 - Use `chartpilot-profile-csv`, `chartpilot-analyze-data`, and `chartpilot-render-chart` for the
   standard CSV pipeline. Invoke their deterministic scripts with the bundled interpreter.
 - Keep analysis calculations in `analysis_plan.json` when the analysis contract can represent
   them. Do not replace an unsupported plan operation with arbitrary Python.
-- Create task-local Python only when the requested operation is outside the existing business
-  contracts and deployment policy explicitly permits generated-code execution.
+- Create task-local Python only outside the default Goose MCP surface, when the requested
+  operation is outside the existing business contracts and deployment policy explicitly
+  permits generated-code execution.
 
 ## Author auditable code
 
