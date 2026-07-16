@@ -1,155 +1,188 @@
-# ChartPilot Windows 离线部署方案
+# ChartPilot Windows 独立运行时与离线部署方案
 
 ## 目标
 
-在 Windows 原生环境中部署 ChartPilot，使其在无外网、无 WSL、无 Docker 依赖的情况下运行，仅保留对 LLM API 的网络访问能力。
+在 Windows 10/11 x64 上提供解压即用的 ChartPilot Skill 与 Python 运行环境：
 
-## 约束
+- 不要求系统安装 Python；
+- 不依赖 WSL、Docker、Conda 或系统 `PATH`；
+- 数据处理和绘图完全在本地执行；
+- 目标机不得在线安装依赖；
+- 未来 Agent 底座只需按固定清单定位和启动解释器。
 
-- 目标平台：Windows 10 / Windows 11
-- 运行方式：原生 Windows，不依赖 WSL
-- 网络条件：默认无外网，仅允许访问 LLM API
-- 部署方式：可拷贝、可解压、可离线安装
-- 运行能力：本地读取 CSV，执行 Python 数据处理，输出图表图片
+当前仓库尚未包含最终 Agent 底座，因此本方案交付的是“便携 Python 运行时 + Skill +
+确定性工具 + 构建与打包流程”。
 
-## 推荐总体架构
+## 固定运行时基线
 
-建议采用“三层打包”：
+| 项目 | 固定值 |
+| --- | --- |
+| 上游 | WinPython |
+| Release | `17.4.20260511final` |
+| 资产 | `WinPython64-3.13.13.0dot.zip` |
+| Python | CPython 3.13.13 x64 |
+| 大小 | `27,697,763` 字节 |
+| SHA-256 | `c6ada5d0a2fef7dc7ae79e4f9c046a55f98e7221a221a250e34dfcab02f384d1` |
 
-1. Agent 底座
-   - 选择一个原生 CLI agent 作为编排内核
-   - 负责对话、工具调用、任务分解、错误重试
+选择 `dot` ZIP，而不是 `slim`、自由线程版本或自解压 EXE：
 
-2. 本地 Python 运行时
-   - 随包附带一个可移植 Python 环境
-   - 用于执行 pandas、matplotlib、numpy 等代码
+- `dot` 是最干净的官方基线，只增加 ChartPilot 当前实际依赖；
+- ZIP 可以无交互解压和校验；
+- 标准 CPython 3.13 的第三方 wheel 兼容面比 3.14/3.15 更稳妥；
+- 项目不需要 WinPython `slim` 中的大量无关科学计算包。
 
-3. 业务能力层
-   - 自定义 skill
-   - 包含 CSV 读取、数据分析、图表绘制、结果摘要逻辑
+`runtime.lock.json` 是上游来源、哈希、解释器路径和环境策略的单一来源。
 
-## 底座选择建议
+## 依赖范围与锁定
 
-优先选择满足以下条件的 CLI agent：
+当前直接依赖：
 
-- 原生支持 Windows
-- 不要求 WSL
-- 能直接配置 OpenAI 兼容 API 或其他 LLM API
-- 支持本地命令执行
-- 允许自定义工具/skill/workflow
+- pandas 3.0.3
+- matplotlib 3.11.0
+- Pillow 12.3.0
 
-当前更适合的方向是：
+openpyxl、seaborn、pyarrow、duckdb 不进入首版运行时。全部直接和传递依赖记录在
+Windows x64 CPython 3.13 专用的 `requirements.runtime.lock.txt`，每一项都包含
+SHA-256。`wheelhouse/` 只接受 `.whl`，不允许源码包或自由线程 wheel。
 
-- 首选：Open Interpreter
-- 备选：Goose
+依赖变更流程：
 
-## 离线部署包内容
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\update-lock.ps1
+```
 
-建议将安装包组织为如下内容：
+该脚本会：
+
+1. 下载并校验固定 WinPython ZIP；
+2. 使用 ZIP 中的 Python/pip，而不是系统 Python；
+3. 只解析 CPython 3.13 Windows x64 二进制 wheel；
+4. 生成确定排序的完整哈希锁；
+5. 事务式替换 `wheelhouse/` 和依赖锁。
+
+刷新后必须人工审查依赖版本、wheel 标签和哈希变化。
+
+## 目录结构
 
 ```text
 ChartPilot/
-  bin/
-    agent.exe
-    python/
+  runtime.lock.json
+  requirements.txt
+  requirements.runtime.lock.txt
+  scripts/runtime/
   skills/
-    csv_reader/
-    analysis/
-    charting/
-  libs/
-    wheels/
-  config/
-    model.yaml
-    runtime.yaml
-  workspace/
+  runtime/                       # 生成，不入 Git
+    runtime-manifest.json
+    third-party-licenses.json
+    winpython/
+      python/
+        python.exe
+  wheelhouse/                    # 构建缓存，不随最终包安装依赖
+  workspace/                     # 运行时可写目录
+  build/                         # staging 和下载缓存
+  dist/                          # 发布 ZIP
 ```
 
-## 关键安装步骤
+最终解释器相对项目根目录固定为：
 
-### 1. 准备 Python 运行时
+```text
+runtime/winpython/python/python.exe
+```
 
-建议使用可移植 Python 或者打包好的嵌入式 Python。
+## 构建运行时
 
-要求：
+联网构建机要求：
 
-- 能离线解压使用
-- 能通过 `python.exe` 直接执行脚本
-- 能预装 pandas、matplotlib、numpy、openpyxl 等依赖
+- Windows 10/11 x64；
+- PowerShell 5.1 或更高版本；
+- 可访问 GitHub Release 和 PyPI；
+- 不需要预先安装 Python 或管理员权限。
 
-### 2. 准备离线依赖包
+构建命令：
 
-提前在有网环境下载 wheel 包：
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\build-runtime.ps1
+```
 
-- pandas
-- numpy
-- matplotlib
-- seaborn
-- pyarrow（可选）
-- openpyxl（如要读 xlsx）
-- duckdb（可选）
+构建过程：
 
-然后在离线机器上本地安装。
+1. 校验缓存或重新下载 WinPython ZIP；
+2. 解压到 `build/` staging；
+3. 通过 `--no-index --find-links --require-hashes` 从 wheelhouse 安装；
+4. 生成运行时清单和第三方许可证元数据；
+5. 检查 Python 版本、架构、`pip check` 和关键模块导入；
+6. 执行三个 CLI 的 `--help`、分析回归测试和 CSV 到 PNG 端到端测试；
+7. staging 全部通过后才替换 `runtime/`，替换失败时恢复原运行时。
 
-### 3. 配置 LLM API
+构建生成物不进入 Git。正式发布应归档 WinPython 原始 ZIP、wheelhouse、依赖锁和发布
+ZIP，以便在无外网构建环境重现同一版本。
 
-仅保留对 LLM API 的访问。
+## Agent 调用协议
 
-建议提供配置项：
+未来 Agent 底座应使用 `chartpilot-run-python` Skill 和
+`skills/chartpilot-run-python/references/runtime-contract.md`：
 
-- API Base URL
-- API Key
-- Model Name
-- Timeout
-- Retry Count
+1. 从受信任安装配置获得 ChartPilot 根目录；
+2. 读取 `runtime/runtime-manifest.json`；
+3. 验证 schema、状态、健康结果和解释器相对路径；
+4. 解析后确认解释器仍位于项目根目录下；
+5. 用进程 API 直接启动绝对解释器，所有参数独立传递；
+6. 失败时明确返回运行时错误，不搜索系统 Python、不在线安装包。
 
-### 4. 配置工作目录
+子进程环境至少应：
 
-将 CSV 文件统一放入工作目录，所有分析输出都写入本地 workspace。
+- 设置 `PYTHONNOUSERSITE=1`、`PYTHONUTF8=1`、`PYTHONDONTWRITEBYTECODE=1`；
+- 设置 `MPLBACKEND=Agg`；
+- 清除 `PYTHONHOME`、`PYTHONPATH`、`VIRTUAL_ENV` 和 Conda 变量；
+- 将 `HOME`、`TEMP`、`TMP`、`MPLCONFIGDIR`、`PYTHONPYCACHEPREFIX` 指向可写 workspace；
+- 移除与当前任务无关的密钥、代理和工具凭据。
 
-建议生成：
+禁止拼接 PowerShell/cmd 命令字符串。用户文件路径必须作为进程参数数组中的独立元素。
 
-- 清洗后的中间数据
-- 分析结果表
-- 图表图片
-- 日志文件
-- 代码快照
+## 生成 Python 代码的边界
 
-## 离线安装流程建议
+标准 CSV 流程继续优先使用三个确定性业务 Skill：
 
-1. 解压 ChartPilot 压缩包
-2. 初始化 Python 环境
-3. 安装本地 wheel 依赖
-4. 配置 LLM API
-5. 运行健康检查
-6. 执行示例 CSV 分析任务
+- profiler 只剖析；
+- analyzer 只执行白名单声明式计划；
+- renderer 只渲染冻结结果。
 
-## Windows 兼容性要求
+只有在业务契约无法覆盖、部署策略明确允许时，Agent 才能通过
+`chartpilot-run-python` 生成通用 Python。生成代码必须：
 
-需要注意以下点：
+- 保存到当前 `workspace/tasks/<task-id>/`；
+- 使用明确输入输出和可审计 `main()`；
+- 只使用运行时清单中的包；
+- 禁止 pip、网络、shell、子进程、动态导入、`eval`、`exec` 和目录外写入；
+- 保存代码哈希、运行时 ID、退出码、耗时及受限输出记录。
 
-- 路径分隔符必须使用 Windows 兼容写法
-- 命令行编码要处理中文文件名
-- 文件锁和权限错误要显式报错
-- 临时目录和缓存目录要可配置
-- 图表保存路径要避免空格和特殊字符问题
+WinPython 只提供运行时隔离，不提供安全沙箱。超时、资源限制、ACL、子进程和网络策略
+仍由 Agent 底座落实。
 
-## 安全要求
+## 验证与发布
 
-- 禁止访问外部网络，除 LLM API 外
-- 仅允许受控目录读写
-- Python 代码执行要有限制
-- 所有执行命令要留日志
-- 对生成代码做简单静态检查
+完整验证：
 
-## 验收标准
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\test-runtime.ps1
+```
 
-部署完成后应满足：
+发布打包：
 
-- Windows 原生可启动
-- 无需 WSL
-- 无需 Docker
-- 能打开本地 CSV
-- 能运行 pandas 分析
-- 能生成图表图片
-- 能输出文本摘要
-- 能稳定连接指定 LLM API
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\package-release.ps1
+```
+
+发布 ZIP 包含运行时、Skill、确定性工具、锁文件、清单和用户文档，不包含 `.git`、
+`.trellis`、`.codex`、wheelhouse、构建缓存或用户 workspace。
+
+当前自动验证覆盖中文文件名、中文字段、带空格的数据路径和 CSV 到 PNG 链路。最终发布前
+仍需在干净 Windows 10/11 x64、非管理员、无系统 Python、无通用外网环境下人工验收。
+
+## 目标机运行规则
+
+- 解压发布 ZIP 后直接使用，不执行安装步骤；
+- 不修改系统 PATH 或注册表；
+- 不在目标机运行 pip；
+- 只允许对指定数据目录和 workspace 读写；
+- 除配置的 LLM API 外，不允许主动访问网络；
+- 升级时替换完整的版本化运行时和清单，不做原地依赖漂移升级。

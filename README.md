@@ -2,82 +2,106 @@
 
 English | [简体中文](README.zh-CN.md)
 
-ChartPilot is a local-first CSV analysis skill set for Windows-oriented data agents. It profiles local CSV files, executes auditable declarative analysis plans, and renders validated PNG charts without sending data processing or chart generation to a remote service.
+ChartPilot is a local-first CSV analysis skill set for Windows data agents. It ships with a
+pinned WinPython runtime and performs CSV profiling, declarative analysis, and PNG rendering
+locally without relying on system Python or sending data-processing work to a remote service.
 
 > [!IMPORTANT]
-> This repository currently contains the three business Skills and their deterministic Python tools. It does not yet include the final Agent runtime, Windows offline bundle, or graphical interface.
+> The repository currently contains three business skills, one Python runtime skill,
+> deterministic Python tools, and the portable-runtime build flow. It does not yet include the
+> final Agent base or a graphical interface.
 
-## Capabilities
+## Core capabilities
 
-- Detect UTF-8, UTF-8 BOM, GBK/GB18030, delimiters, field types, missing values, duplicates, and candidate field roles.
-- Apply explicit cleaning, filtering, date bucketing, grouped metrics, Top N, share, and percentage-change operations through an allowlisted plan.
-- Render line, bar, donut, and scatter charts from a SHA-256-bound `result.csv` without recomputing business metrics.
-- Preserve source files, emit structured errors, and install multi-file results transactionally.
-- Support Chinese paths, headers, labels, and offline dependency installation.
+- Detect UTF-8, UTF-8 BOM, GBK/GB18030, delimiters, field types, missing values, duplicates,
+  and candidate field roles.
+- Execute allowlisted cleaning, filtering, time bucketing, aggregation, Top N, share, and
+  percentage-change operations from a versioned analysis plan.
+- Render line, bar, donut, and scatter PNG charts from SHA-256-bound `result.csv` artifacts
+  without recomputing business metrics during charting.
+- Use a pinned WinPython CPython 3.13.13 Windows x64 runtime instead of system `python` or
+  `py.exe`.
+- Protect source files, return structured errors, and commit multi-file artifact sets
+  transactionally.
+- Support Chinese paths, headers, chart labels, and offline execution.
 
-## Repository Layout
+## Repository structure
 
 ```text
 ChartPilot/
+├── runtime.lock.json
+├── requirements.txt
+├── requirements.runtime.lock.txt
+├── scripts/runtime/
 ├── skills/
+│   ├── chartpilot-run-python/
 │   ├── chartpilot-profile-csv/
 │   ├── chartpilot-analyze-data/
 │   └── chartpilot-render-chart/
 ├── ChartPilot需求规格说明.md
 ├── Skill开发说明.md
-├── Windows离线部署方案.md
-└── requirements.txt
+└── Windows离线部署方案.md
 ```
 
-Each Skill contains a concise `SKILL.md`, UI metadata, a detailed contract, and a deterministic Python entry point. The analysis Skill also includes regression tests.
+`runtime/`, `wheelhouse/`, `build/`, and `dist/` are generated locally and excluded from Git.
 
-## Requirements
+## Build the portable runtime
 
-- Python 3.12 recommended
-- Windows 10 or Windows 11 for the target deployment
-- `pandas`, `matplotlib`, and `Pillow` from [`requirements.txt`](requirements.txt)
+The build host needs Windows 10/11 x64 and PowerShell 5.1 or later. A preinstalled Python is
+not required. ChartPilot pins `WinPython64-3.13.13.0dot.zip` from WinPython release
+`17.4.20260511final` and verifies its byte size and SHA-256 before extraction.
 
-Create a local development environment:
+Build the runtime:
 
-```bash
-python -m venv .venv
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\build-runtime.ps1
 ```
 
-Activate it, then install dependencies:
+This creates `runtime/`, installs dependencies from the hash-locked wheelhouse, and runs
+dependency checks, CLI smoke tests, regression tests, and a CSV-to-PNG end-to-end test.
 
-```bash
-python -m pip install -r requirements.txt
+Refresh the full dependency lock only after changing `requirements.txt`:
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\update-lock.ps1
 ```
 
-For an offline Windows deployment, download compatible Windows wheels on a connected build machine and install them from a local wheel directory. See [Windows离线部署方案.md](Windows离线部署方案.md).
+Review every version and hash change in `requirements.runtime.lock.txt`.
 
-## Workflow
+## Run the pipeline
+
+Use the bundled interpreter for every command:
+
+```powershell
+$python = ".\runtime\winpython\python\python.exe"
+```
 
 Profile a CSV:
 
-```bash
-python skills/chartpilot-profile-csv/scripts/profile_csv.py "data/sales.csv" \
-  --task-id demo-001 \
-  --output-dir "workspace/tasks/demo-001"
+```powershell
+& $python -I .\skills\chartpilot-profile-csv\scripts\profile_csv.py "data\sales.csv" `
+  --task-id demo-001 `
+  --output-dir "workspace\tasks\demo-001"
 ```
 
-Create `analysis_plan.json` according to the [analysis contract](skills/chartpilot-analyze-data/references/contracts.md), then run it:
+Create `analysis_plan.json` according to the
+[analysis contract](skills/chartpilot-analyze-data/references/contracts.md), then run:
 
-```bash
-python skills/chartpilot-analyze-data/scripts/run_analysis.py \
-  --profile "workspace/tasks/demo-001/input_profile.json" \
-  --plan "workspace/tasks/demo-001/analysis_plan.json" \
-  --output-dir "workspace/tasks/demo-001"
+```powershell
+& $python -I .\skills\chartpilot-analyze-data\scripts\run_analysis.py `
+  --profile "workspace\tasks\demo-001\input_profile.json" `
+  --plan "workspace\tasks\demo-001\analysis_plan.json" `
+  --output-dir "workspace\tasks\demo-001"
 ```
 
 Render the saved result:
 
-```bash
-python skills/chartpilot-render-chart/scripts/render_chart.py \
-  --analysis-result "workspace/tasks/demo-001/analysis_result.json"
+```powershell
+& $python -I .\skills\chartpilot-render-chart\scripts\render_chart.py `
+  --analysis-result "workspace\tasks\demo-001\analysis_result.json"
 ```
 
-The normal artifact chain is:
+Artifact flow:
 
 ```text
 input_profile.json
@@ -86,30 +110,51 @@ input_profile.json
   -> chart.png + chart_result.json + summary.md
 ```
 
-## Tests
+## Validate and package
 
-Run the analysis regression suite:
+Run the complete validation suite:
 
-```bash
-python -m unittest discover -s skills/chartpilot-analyze-data/tests -v
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\test-runtime.ps1
 ```
 
-Every CLI also supports `--help`. The current implementation has been integration-tested with Chinese paths and CSV content on Python 3.12. Native Windows 10/11 acceptance testing remains pending.
+Create the release ZIP:
 
-## Security Boundary
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\package-release.ps1
+```
 
-- The bundled Python tools do not make network requests or execute model-provided Python expressions.
-- Source and upstream artifacts are bound by SHA-256 and checked before downstream use.
-- Sample disclosure can be disabled or redacted during profiling.
-- API keys must remain in runtime configuration and must never be written to plans, generated code, logs, or results.
-- Skills are not an operating-system sandbox. The final Windows runtime must enforce directory ACLs, process timeouts, resource limits, and an LLM-endpoint-only network policy.
+The output is `dist/ChartPilot-runtime-win-x64-py3.13.zip`. Perform a final manual acceptance
+pass on clean, non-admin Windows 10 and Windows 11 hosts before release.
 
-## Documentation
+## Agent runtime contract
+
+`chartpilot-run-python` defines how a future Agent base reads
+`runtime/runtime-manifest.json`, validates the interpreter, sanitizes Python environment
+variables, starts the process with an argument array, and records generated code and execution
+evidence. The three business skills continue to prefer deterministic runners and do not admit
+arbitrary expressions into the standard CSV pipeline.
+
+## Security boundaries
+
+- Bundled business tools do not make network requests or execute model-provided Python
+  expressions.
+- Source files and upstream artifacts are SHA-256-bound and revalidated downstream.
+- CSV samples can be omitted or redacted for sensitive-looking fields.
+- Target machines must not run online pip installs; dependencies change only during a
+  hash-reviewed build.
+- API keys must never be written to plans, generated code, logs, or results.
+- WinPython is not an operating-system sandbox. The future Agent base still owns ACLs,
+  process timeouts, resource limits, and network policy.
+
+## Project documents
 
 - [Requirements specification](ChartPilot需求规格说明.md)
-- [Skill development guide](Skill开发说明.md)
-- [Windows offline deployment plan](Windows离线部署方案.md)
+- [Skill development notes](Skill开发说明.md)
+- [Windows offline deployment](Windows离线部署方案.md)
 
 ## License
 
-No software license has been selected yet. Repository visibility does not grant permission to use, modify, or redistribute the code beyond rights provided by applicable law.
+The project has not selected a software license. Public availability does not grant rights to
+use, modify, or redistribute the repository beyond applicable law. The generated
+`runtime/third-party-licenses.json` records license metadata for installed distributions.
