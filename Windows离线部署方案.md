@@ -8,10 +8,10 @@
 - 不依赖 WSL、Docker、Conda 或系统 `PATH`；
 - 数据处理和绘图完全在本地执行；
 - 目标机不得在线安装依赖；
-- 未来 Agent 底座只需按固定清单定位和启动解释器。
+- Goose Desktop Agent 底座只按固定清单调用 ChartPilot MCP 和捆绑解释器。
 
-当前仓库尚未包含最终 Agent 底座，因此本方案交付的是“便携 Python 运行时 + Skill +
-确定性工具 + 构建与打包流程”。
+本方案交付“便携 Goose Desktop + 便携 Python 运行时 + Skill + 受限 MCP + 确定性工具 +
+构建与打包流程”。
 
 ## 固定运行时基线
 
@@ -33,6 +33,19 @@
 
 `runtime.lock.json` 是上游来源、哈希、解释器路径和环境策略的单一来源。
 
+Goose 底座固定为：
+
+| 项目 | 固定值 |
+| --- | --- |
+| 上游 | `aaif-goose/goose` |
+| Release | `v1.43.0` |
+| 资产 | `Goose-win32-x64.zip` |
+| 平台 | Windows x64 Desktop，无 CUDA |
+| 大小 | `250,045,188` 字节 |
+| SHA-256 | `9014edf214395370d3de5a3dd7acc90cb2eace2abc5ee398266f7809b7726956` |
+
+`goose.lock.json` 是 Goose 来源、版本、资产哈希、入口点和必需文件的单一来源。
+
 ## 依赖范围与锁定
 
 当前直接依赖：
@@ -40,6 +53,8 @@
 - pandas 3.0.3
 - matplotlib 3.11.0
 - Pillow 12.3.0
+- mcp 1.28.1
+- PyYAML 6.0.3
 
 openpyxl、seaborn、pyarrow、duckdb 不进入首版运行时。全部直接和传递依赖记录在
 Windows x64 CPython 3.13 专用的 `requirements.runtime.lock.txt`，每一项都包含
@@ -65,14 +80,22 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\update-loc
 
 ```text
 ChartPilot/
+  Start-ChartPilot.cmd
+  goose.lock.json
   runtime.lock.json
   requirements.txt
   requirements.runtime.lock.txt
+  agent/
+  scripts/agent/
   scripts/runtime/
   skills/
   runtime/                       # 生成，不入 Git
     runtime-manifest.json
+    goose-manifest.json
     third-party-licenses.json
+    goose/
+      Goose.exe
+      resources/bin/goose.exe
     winpython/
       python/
         python.exe
@@ -116,10 +139,27 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\build-runt
 构建生成物不进入 Git。正式发布应归档 WinPython 原始 ZIP、wheelhouse、依赖锁和发布
 ZIP，以便在无外网构建环境重现同一版本。
 
+使用已经下载的无 CUDA Goose ZIP 构建 Agent 底座：
+
+```powershell
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent\build-goose.ps1 `
+  -SourceArchive "C:\path\to\Goose-win32-x64.zip"
+```
+
+省略 `-SourceArchive` 时从锁定 URL 下载。脚本在解压前验证大小、SHA-256、ZIP 路径和
+必需入口点，在 staging 中运行 CLI 版本检查，成功后事务式替换 `runtime/goose` 并生成
+`runtime/goose-manifest.json`。
+
 ## Agent 调用协议
 
-未来 Agent 底座应使用 `chartpilot-run-python` Skill 和
-`skills/chartpilot-run-python/references/runtime-contract.md`：
+Goose 通过 Summon 加载四个 ChartPilot Skill，并通过 stdio 启动
+`agent/mcp/chartpilot_mcp.py`。默认只暴露：
+
+- `chartpilot_profile_csv`
+- `chartpilot_analyze_data`
+- `chartpilot_render_chart`
+
+MCP 桥接和 `chartpilot-run-python` 共同执行以下协议：
 
 1. 从受信任安装配置获得 ChartPilot 根目录；
 2. 读取 `runtime/runtime-manifest.json`；
@@ -137,6 +177,7 @@ ZIP，以便在无外网构建环境重现同一版本。
 - 移除与当前任务无关的密钥、代理和工具凭据。
 
 禁止拼接 PowerShell/cmd 命令字符串。用户文件路径必须作为进程参数数组中的独立元素。
+默认 Goose 配置不启用 Developer 扩展，也不向模型开放通用 shell。
 
 ## 生成 Python 代码的边界
 
@@ -146,7 +187,8 @@ ZIP，以便在无外网构建环境重现同一版本。
 - analyzer 只执行白名单声明式计划；
 - renderer 只渲染冻结结果。
 
-只有在业务契约无法覆盖、部署策略明确允许时，Agent 才能通过
+默认 Goose MCP 不提供任意生成 Python。只有在业务契约无法覆盖、部署策略明确允许且
+使用默认 MCP 之外的独立受控入口时，Agent 才能通过
 `chartpilot-run-python` 生成通用 Python。生成代码必须：
 
 - 保存到当前 `workspace/tasks/<task-id>/`；
@@ -156,7 +198,7 @@ ZIP，以便在无外网构建环境重现同一版本。
 - 保存代码哈希、运行时 ID、退出码、耗时及受限输出记录。
 
 WinPython 只提供运行时隔离，不提供安全沙箱。超时、资源限制、ACL、子进程和网络策略
-仍由 Agent 底座落实。
+仍需由 MCP 边界和部署环境落实。Goose 在 Windows 上同样不应被视为操作系统沙箱。
 
 ## 验证与发布
 
@@ -164,6 +206,7 @@ WinPython 只提供运行时隔离，不提供安全沙箱。超时、资源限�
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\test-runtime.ps1
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent\test-agent.ps1
 ```
 
 发布打包：
@@ -172,7 +215,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\test-runti
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\package-release.ps1
 ```
 
-发布 ZIP 包含运行时、Skill、确定性工具、锁文件、清单和用户文档，不包含 `.git`、
+发布 ZIP 包含 Goose、WinPython、MCP、启动器、Skill、确定性工具、锁文件、清单和用户文档，不包含 `.git`、
 `.trellis`、`.codex`、wheelhouse、构建缓存或用户 workspace。
 
 当前自动验证覆盖中文文件名、中文字段、带空格的数据路径和 CSV 到 PNG 链路。最终发布前
@@ -180,9 +223,11 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\package-re
 
 ## 目标机运行规则
 
-- 解压发布 ZIP 后直接使用，不执行安装步骤；
+- 解压发布 ZIP 后运行 `Start-ChartPilot.cmd`，不执行安装步骤；
+- 首次使用在 Goose 中配置模型 Provider；
 - 不修改系统 PATH 或注册表；
 - 不在目标机运行 pip；
 - 只允许对指定数据目录和 workspace 读写；
 - 除配置的 LLM API 外，不允许主动访问网络；
+- 禁止在固定发行包中使用 Goose 自更新，升级必须先更新锁并重建完整运行时；
 - 升级时替换完整的版本化运行时和清单，不做原地依赖漂移升级。

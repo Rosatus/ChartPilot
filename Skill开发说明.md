@@ -130,14 +130,21 @@
 
 ## 与底座的关系
 
-底座 agent 负责：
+Goose Desktop 底座负责：
 
 - 对话调度
 - 调用 skill
-- 调用本地 Python
+- 通过 ChartPilot stdio MCP 调用本地 Python
 - 管理上下文
 - 读取 `runtime/runtime-manifest.json` 并直接启动固定解释器
-- 对通用生成代码施加超时、资源、目录和网络策略
+- 提供 Provider、会话和图形界面
+
+ChartPilot MCP 负责：
+
+- 只暴露 `chartpilot_profile_csv`、`chartpilot_analyze_data`、`chartpilot_render_chart`
+- 根据任务 ID 把下游调用限制在 `workspace/tasks/`
+- 读取运行时清单并用参数数组直接启动固定解释器
+- 设置受信任读写根、超时、结构化错误和输出上限
 
 skill 负责：
 
@@ -153,7 +160,8 @@ skill 负责：
 - 任务目录内生成代码的基本结构
 - 执行记录和错误分类
 
-业务 Skill 不应自行搜索系统 Python，也不应在目标机运行 pip。
+业务 Skill 在 Goose 中应优先调用命名 MCP 工具，不应启用 Developer 扩展或通用 shell。
+任何 Skill 都不应自行搜索系统 Python，也不应在目标机运行 pip。
 
 ## 建议的最小实现
 
