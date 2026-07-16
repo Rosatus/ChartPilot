@@ -1,0 +1,46 @@
+{
+  "schema_version": "chartpilot.runtime-lock/v1",
+  "runtime_id": "winpython-cpython-3.13.13-win-amd64",
+  "upstream": {
+    "project": "WinPython",
+    "repository": "https://github.com/winpython/winpython",
+    "release": "17.4.20260511final",
+    "asset": "WinPython64-3.13.13.0dot.zip",
+    "url": "https://github.com/winpython/winpython/releases/download/17.4.20260511final/WinPython64-3.13.13.0dot.zip",
+    "size_bytes": 27697763,
+    "sha256": "c6ada5d0a2fef7dc7ae79e4f9c046a55f98e7221a221a250e34dfcab02f384d1"
+  },
+  "python": {
+    "implementation": "CPython",
+    "version": "3.13.13",
+    "architecture": "64bit",
+    "interpreter": "runtime/winpython/python/python.exe"
+  },
+  "dependencies": {
+    "direct_requirements": "requirements.txt",
+    "locked_requirements": "requirements.runtime.lock.txt",
+    "wheelhouse": "wheelhouse"
+  },
+  "environment": {
+    "set": {
+      "PYTHONNOUSERSITE": "1",
+      "PYTHONUTF8": "1",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "MPLBACKEND": "Agg"
+    },
+    "unset": [
+      "PYTHONHOME",
+      "PYTHONPATH",
+      "VIRTUAL_ENV",
+      "CONDA_PREFIX",
+      "CONDA_DEFAULT_ENV"
+    ],
+    "workspace_paths": {
+      "HOME": "home",
+      "TEMP": "temp",
+      "TMP": "temp",
+      "MPLCONFIGDIR": "matplotlib",
+      "PYTHONPYCACHEPREFIX": "pycache"
+    }
+  }
+}

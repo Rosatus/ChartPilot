@@ -1,0 +1,15 @@
+{
+  "schema_version": "chartpilot.release-files/v1",
+  "root_files": [
+    ".gitattributes",
+    "ChartPilot需求规格说明.md",
+    "README.md",
+    "README.zh-CN.md",
+    "release.files.json",
+    "requirements.txt",
+    "requirements.runtime.lock.txt",
+    "runtime.lock.json",
+    "Skill开发说明.md",
+    "Windows离线部署方案.md"
+  ]
+}

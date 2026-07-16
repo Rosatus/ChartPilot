@@ -26,11 +26,13 @@ env/
 !.env.example
 
 # Runtime and build outputs
+/runtime/
 workspace/
 output/
 build/
 dist/
 wheelhouse/
+*.partial
 *.egg-info/
 *.log
 

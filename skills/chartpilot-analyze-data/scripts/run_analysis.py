@@ -2026,7 +2026,8 @@ def make_temp_path(output_dir: Path, destination_name: str) -> Path:
 
 
 def fsync_path(path: Path) -> None:
-    with path.open("rb") as handle:
+    # Windows CPython 3.13 rejects fsync on a read-only descriptor.
+    with path.open("r+b") as handle:
         os.fsync(handle.fileno())
 
 

@@ -31,6 +31,15 @@ def load_runner():
 
 
 class RunAnalysisTests(unittest.TestCase):
+    def test_fsync_path_succeeds_for_existing_file(self) -> None:
+        module = load_runner()
+
+        with tempfile.TemporaryDirectory(prefix="chartpilot-fsync-") as temporary:
+            path = Path(temporary) / "artifact.csv"
+            path.write_text("value\n1\n", encoding="utf-8")
+            module.fsync_path(path)
+            self.assertEqual(path.read_text(encoding="utf-8"), "value\n1\n")
+
     def test_grouped_sum_preserves_all_missing_group(self) -> None:
         with tempfile.TemporaryDirectory(prefix="chartpilot-analysis-") as temporary:
             root = Path(temporary)
