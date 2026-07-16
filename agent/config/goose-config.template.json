@@ -1,0 +1,43 @@
+{
+  "GOOSE_MODE": "smart_approve",
+  "GOOSE_TELEMETRY_ENABLED": false,
+  "GOOSE_DISABLE_SESSION_NAMING": true,
+  "extensions": {
+    "summon": {
+      "enabled": true,
+      "type": "builtin",
+      "name": "summon",
+      "display_name": "Summon",
+      "description": "Load the bundled ChartPilot Agent Skills.",
+      "timeout": 300,
+      "bundled": true,
+      "available_tools": []
+    },
+    "chartpilot": {
+      "enabled": true,
+      "type": "stdio",
+      "name": "chartpilot",
+      "display_name": "ChartPilot",
+      "description": "Deterministic local CSV profiling, analysis, and chart rendering.",
+      "cmd": "${CHARTPILOT_PYTHON}",
+      "args": [
+        "-I",
+        "${CHARTPILOT_MCP_SERVER}"
+      ],
+      "cwd": "${CHARTPILOT_ROOT}",
+      "env_keys": [],
+      "envs": {
+        "CHARTPILOT_ROOT": "${CHARTPILOT_ROOT}",
+        "CHARTPILOT_WORKSPACE_ROOT": "${CHARTPILOT_WORKSPACE_ROOT}",
+        "CHARTPILOT_ALLOWED_READ_ROOTS": "${CHARTPILOT_ALLOWED_READ_ROOTS}"
+      },
+      "timeout": 300,
+      "bundled": true,
+      "available_tools": [
+        "chartpilot_profile_csv",
+        "chartpilot_analyze_data",
+        "chartpilot_render_chart"
+      ]
+    }
+  }
+}

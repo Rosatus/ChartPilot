@@ -1,0 +1,32 @@
+{
+  "schema_version": "chartpilot.goose-lock/v1",
+  "runtime_id": "goose-desktop-1.43.0-win-x64-nocuda",
+  "upstream": {
+    "project": "goose",
+    "repository": "https://github.com/aaif-goose/goose",
+    "release": "v1.43.0",
+    "asset": "Goose-win32-x64.zip",
+    "url": "https://github.com/aaif-goose/goose/releases/download/v1.43.0/Goose-win32-x64.zip",
+    "size_bytes": 250045188,
+    "sha256": "9014edf214395370d3de5a3dd7acc90cb2eace2abc5ee398266f7809b7726956"
+  },
+  "goose": {
+    "version": "1.43.0",
+    "architecture": "x86_64",
+    "platform": "windows",
+    "variant": "desktop-nocuda",
+    "archive_root": "dist-windows",
+    "desktop": "runtime/goose/Goose.exe",
+    "cli": "runtime/goose/resources/bin/goose.exe"
+  },
+  "required_files": [
+    "Goose.exe",
+    "LICENSE",
+    "LICENSES.chromium.html",
+    "resources/app.asar",
+    "resources/app-update.yml",
+    "resources/bin/goose.exe",
+    "resources/bin/uv.exe",
+    "resources/bin/uvx.exe"
+  ]
+}

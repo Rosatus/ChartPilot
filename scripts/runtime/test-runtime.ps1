@@ -54,7 +54,7 @@ $checks.Add("pip-check")
 Invoke-CheckedCommand -FilePath $python -Label "Import runtime dependencies" -Arguments @(
     "-I",
     "-c",
-    "import pandas,matplotlib,PIL; print(pandas.__version__, matplotlib.__version__, PIL.__version__)"
+    "import importlib.metadata,pandas,matplotlib,PIL,mcp,yaml; print(pandas.__version__, matplotlib.__version__, PIL.__version__, importlib.metadata.version('mcp'), yaml.__version__)"
 )
 $checks.Add("imports")
 

@@ -5,6 +5,8 @@
     "ChartPilot需求规格说明.md",
     "README.md",
     "README.zh-CN.md",
+    "Start-ChartPilot.cmd",
+    "goose.lock.json",
     "release.files.json",
     "requirements.txt",
     "requirements.runtime.lock.txt",

@@ -1,6 +1,6 @@
 [CmdletBinding()]
 param(
-    [string]$OutputName = "ChartPilot-runtime-win-x64-py3.13.zip"
+    [string]$OutputName = "ChartPilot-win-x64-goose-py3.13.zip"
 )
 
 Set-StrictMode -Version Latest
@@ -45,10 +45,16 @@ try {
     & (Join-Path $PSScriptRoot "test-runtime.ps1") `
         -ProjectRoot $projectRoot `
         -RuntimeRoot $runtimeRoot
+    & (Join-Path $projectRoot "scripts\agent\test-agent.ps1") `
+        -ProjectRoot $projectRoot `
+        -RuntimeRoot $runtimeRoot
 
     New-Item -ItemType Directory -Path $packageRoot, $distRoot -Force | Out-Null
     Copy-FilteredTree -Source $runtimeRoot -Destination (Join-Path $packageRoot "runtime")
+    Copy-FilteredTree -Source (Join-Path $projectRoot "agent") -Destination (Join-Path $packageRoot "agent")
     Copy-FilteredTree -Source (Join-Path $projectRoot "skills") -Destination (Join-Path $packageRoot "skills")
+    Copy-FilteredTree -Source (Join-Path $projectRoot "skills") -Destination (Join-Path $packageRoot ".agents\skills")
+    Copy-FilteredTree -Source (Join-Path $projectRoot "scripts\agent") -Destination (Join-Path $packageRoot "scripts\agent")
     Copy-FilteredTree -Source (Join-Path $projectRoot "scripts\runtime") -Destination (Join-Path $packageRoot "scripts\runtime")
 
     $releaseFilesPath = Join-Path $projectRoot "release.files.json"
@@ -79,20 +85,53 @@ try {
         $entries = @($archive.Entries | ForEach-Object { $_.FullName.Replace('\', '/') })
         $requiredEntries = @(
             "ChartPilot/runtime/runtime-manifest.json",
+            "ChartPilot/runtime/goose-manifest.json",
             "ChartPilot/runtime/third-party-licenses.json",
             "ChartPilot/runtime/winpython/python/python.exe",
+            "ChartPilot/runtime/goose/Goose.exe",
+            "ChartPilot/runtime/goose/resources/bin/goose.exe",
+            "ChartPilot/runtime/goose/LICENSE",
+            "ChartPilot/Start-ChartPilot.cmd",
+            "ChartPilot/agent/mcp/chartpilot_mcp.py",
             "ChartPilot/skills/chartpilot-run-python/SKILL.md",
             "ChartPilot/skills/chartpilot-profile-csv/SKILL.md",
             "ChartPilot/skills/chartpilot-analyze-data/SKILL.md",
             "ChartPilot/skills/chartpilot-render-chart/SKILL.md",
+            "ChartPilot/.agents/skills/chartpilot-run-python/SKILL.md",
+            "ChartPilot/.agents/skills/chartpilot-profile-csv/SKILL.md",
+            "ChartPilot/.agents/skills/chartpilot-analyze-data/SKILL.md",
+            "ChartPilot/.agents/skills/chartpilot-render-chart/SKILL.md",
+            "ChartPilot/scripts/agent/start-chartpilot.ps1",
+            "ChartPilot/scripts/agent/test-agent.ps1",
             "ChartPilot/scripts/runtime/test-runtime.ps1",
             "ChartPilot/release.files.json",
             "ChartPilot/requirements.runtime.lock.txt",
-            "ChartPilot/runtime.lock.json"
+            "ChartPilot/runtime.lock.json",
+            "ChartPilot/goose.lock.json"
         )
         $missingEntries = @($requiredEntries | Where-Object { $entries -notcontains $_ })
         if ($missingEntries.Count -gt 0) {
             throw "Release ZIP is missing required entries: $($missingEntries -join ', ')"
+        }
+        $forbiddenPrefixes = @(
+            "ChartPilot/.git/",
+            "ChartPilot/.trellis/",
+            "ChartPilot/.codex/",
+            "ChartPilot/build/",
+            "ChartPilot/dist/",
+            "ChartPilot/wheelhouse/",
+            "ChartPilot/workspace/"
+        )
+        $forbiddenEntries = @(
+            $entries | Where-Object {
+                $entry = $_
+                @($forbiddenPrefixes | Where-Object {
+                    $entry.StartsWith($_, [System.StringComparison]::OrdinalIgnoreCase)
+                }).Count -gt 0
+            }
+        )
+        if ($forbiddenEntries.Count -gt 0) {
+            throw "Release ZIP contains forbidden project data: $($forbiddenEntries -join ', ')"
         }
     }
     finally {
