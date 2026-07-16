@@ -40,3 +40,38 @@ Pinned and built a WinPython CPython 3.13.13 runtime, hash-locked the CSV analys
 ### Next Steps
 
 - None - task complete
+
+
+## Session 2: Portable Goose agent base
+
+**Date**: 2026-07-16
+**Task**: Portable Goose agent base
+**Branch**: `main`
+
+### Summary
+
+Integrated pinned non-CUDA Goose Desktop with portable state, constrained ChartPilot MCP tools, Goose-compatible product Skills, release packaging, validation, and bilingual documentation.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `20b4552` | (see git log) |
+| `8833cac` | (see git log) |
+| `edac0d9` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
