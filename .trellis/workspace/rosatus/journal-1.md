@@ -175,3 +175,36 @@ Added recoverable MCP diagnostics, auxiliary artifacts, CJK render validation, v
 ### Next Steps
 
 - None - task complete
+
+
+## Session 6: Align chart script archetypes
+
+**Date**: 2026-07-17
+**Task**: Align chart script archetypes
+**Branch**: `main`
+
+### Summary
+
+Added a role-matched group risk threshold bubble archetype, aligned generated analysis and render source contracts with the human SY135 workflow, separated peer-baseline grain from volume weights, strengthened source-level regressions, and validated the portable release.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `f99f8e0` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete

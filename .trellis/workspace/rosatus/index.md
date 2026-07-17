@@ -8,7 +8,7 @@
 
 <!-- @@@auto:current-status -->
 - **Active File**: `journal-1.md`
-- **Total Sessions**: 5
+- **Total Sessions**: 6
 - **Last Active**: 2026-07-17
 <!-- @@@/auto:current-status -->
 
@@ -19,7 +19,7 @@
 <!-- @@@auto:active-documents -->
 | File | Lines | Status |
 |------|-------|--------|
-| `journal-1.md` | ~177 | Active |
+| `journal-1.md` | ~210 | Active |
 <!-- @@@/auto:active-documents -->
 
 ---
@@ -29,6 +29,7 @@
 <!-- @@@auto:session-history -->
 | # | Date | Title | Commits | Branch |
 |---|------|-------|---------|--------|
+| 6 | 2026-07-17 | Align chart script archetypes | `f99f8e0` | `main` |
 | 5 | 2026-07-17 | Improve Goose SY135 adaptive analysis quality | `de239b4` | `main` |
 | 4 | 2026-07-17 | Bootstrap Agent and Trellis infrastructure | `0b655e5` | `main` |
 | 3 | 2026-07-17 | Adaptive-only CSV analysis workflow | `3be10bb`, `8bae54b` | `main` |
