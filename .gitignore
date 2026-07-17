@@ -39,5 +39,6 @@ env/
 # Editors and operating systems
 .idea/
 .vscode/
+.codegraph/
 .DS_Store
 Thumbs.db

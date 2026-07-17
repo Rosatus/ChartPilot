@@ -1,39 +1,30 @@
 # Backend Development Guidelines
 
-> Best practices for backend development in this project.
+## Scope
 
----
+ChartPilot is a Windows-first portable Python and Goose toolchain. These specs cover build scripts,
+runtime metadata, Goose integration, the stdio MCP bridge, Agent Skills/templates, tests, and
+release packaging.
 
-## Overview
+## Guidelines
 
-This directory contains guidelines for backend development. Fill in each file with your project's specific conventions.
+| Guide | Use When |
+| --- | --- |
+| [Directory Structure](./directory-structure.md) | Locating new code or deciding ownership between runtime, Agent, MCP, and task templates |
+| [Database Guidelines](./database-guidelines.md) | Working with persisted file state or considering a new persistence layer |
+| [Error Handling](./error-handling.md) | Adding validation, subprocesses, file replacement, rollback, or caller-facing errors |
+| [Logging Guidelines](./logging-guidelines.md) | Adding CLI output, build progress, execution records, or diagnostics |
+| [Quality Guidelines](./quality-guidelines.md) | Implementing, testing, reviewing, or preparing a release |
+| [Portable Runtime Guidelines](./runtime-guidelines.md) | Changing WinPython, Goose, MCP signatures, templates, environment policy, or release contracts |
 
----
+## Pre-Development Checklist
 
-## Guidelines Index
+1. Read `directory-structure.md` to identify the owning layer.
+2. Read `runtime-guidelines.md` for any runtime, dependency, Goose, MCP, Skill, or packaging change.
+3. Read `error-handling.md` when a change can fail after side effects begin.
+4. Read `logging-guidelines.md` before changing stdout/stderr or persisted execution records.
+5. Read `quality-guidelines.md` and choose checks proportional to the changed contract.
+6. Read `database-guidelines.md` only for persisted state; the current product has no database.
 
-| Guide | Description | Status |
-|-------|-------------|--------|
-| [Directory Structure](./directory-structure.md) | Module organization and file layout | To fill |
-| [Database Guidelines](./database-guidelines.md) | ORM patterns, queries, migrations | To fill |
-| [Error Handling](./error-handling.md) | Error types, handling strategies | To fill |
-| [Quality Guidelines](./quality-guidelines.md) | Code standards, forbidden patterns | To fill |
-| [Logging Guidelines](./logging-guidelines.md) | Structured logging, log levels | To fill |
-| [Portable Runtime Guidelines](./runtime-guidelines.md) | WinPython and Goose build, execution, MCP, and packaging contracts | Active |
-
----
-
-## How to Fill These Guidelines
-
-For each guideline file:
-
-1. Document your project's **actual conventions** (not ideals)
-2. Include **code examples** from your codebase
-3. List **forbidden patterns** and why
-4. Add **common mistakes** your team has made
-
-The goal is to help AI assistants and new team members understand how YOUR project works.
-
----
-
-**Language**: All documentation should be written in **English**.
+All specs describe the current repository and use English. Update them when a new local convention
+or cross-layer contract is introduced.
