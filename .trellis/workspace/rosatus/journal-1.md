@@ -75,3 +75,37 @@ Integrated pinned non-CUDA Goose Desktop with portable state, constrained ChartP
 ### Next Steps
 
 - None - task complete
+
+
+## Session 3: Adaptive-only CSV analysis workflow
+
+**Date**: 2026-07-17
+**Task**: Adaptive-only CSV analysis workflow
+**Branch**: `main`
+
+### Summary
+
+Removed the three deterministic ChartPilot tools and Skills, added the two-tool adaptive Goose bridge with editable inspect/analyze/render templates, validated synthetic and external SY135 workflows, and rebuilt the portable release ZIP.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `3be10bb` | (see git log) |
+| `8bae54b` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
