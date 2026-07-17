@@ -109,3 +109,36 @@ Removed the three deterministic ChartPilot tools and Skills, added the two-tool 
 ### Next Steps
 
 - None - task complete
+
+
+## Session 4: Bootstrap Agent and Trellis infrastructure
+
+**Date**: 2026-07-17
+**Task**: Bootstrap Agent and Trellis infrastructure
+**Branch**: `main`
+
+### Summary
+
+Filled project-specific backend specs from the current portable runtime, Goose, MCP, Skill, and test code; tracked shared Trellis/Codex/Agent infrastructure; ignored local CodeGraph state; and completed the bootstrap task.
+
+### Main Changes
+
+- Detailed change bullets were not supplied; see the summary above.
+
+### Git Commits
+
+| Hash | Message |
+|------|---------|
+| `0b655e5` | (see git log) |
+
+### Testing
+
+- Validation was not recorded for this session.
+
+### Status
+
+[OK] **Completed**
+
+### Next Steps
+
+- None - task complete
