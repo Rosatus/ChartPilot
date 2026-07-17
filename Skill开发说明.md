@@ -2,192 +2,142 @@
 
 ## 目标
 
-将 ChartPilot 拆成可复用、可维护的 Skill 体系，让 Agent 在处理 CSV 分析时具备稳定的分步能力，并始终使用项目携带的固定 Python 运行时。
+ChartPilot 使用一个高自由度产品 Skill，把自然语言需求和本地 CSV 转化为任务特定的
+Python 分析与图表。Skill 不把需求压入固定操作词表，而是指导 Agent 修改三份轻量模板，
+并始终通过项目携带的 WinPython 执行。
 
-## 总体建议
+## 唯一产品 Skill
 
-建议拆成 3 个 skill，而不是把所有能力塞进一个大 skill。
-
-这里的 3 个是业务 Skill。运行时定位、代码编写和本地执行规则单独由基础设施 Skill
-`chartpilot-run-python` 管理，避免在三个业务 Skill 中复制同一套解释器和环境说明。
-
-原因：
-
-- 职责单一，便于调试
-- 复用性更强
-- 每一步输出都能校验
-- 更容易控制 prompt 和工具边界
-
-## 推荐拆分
-
-### Skill 1：CSV 读取与数据抓取
-
-职责：
-
-- 读取 CSV 文件
-- 获取表头、字段类型、缺失率、行数、列数
-- 识别可用于分析的候选字段
-- 做基础预览
-
-输出：
-
-- 字段清单
-- 数据样例
-- 数据概况
-- 可分析建议
-
-### Skill 2：数据分析
-
-职责：
-
-- 基于字段语义生成分析思路
-- 执行清洗
-- 处理缺失值、重复值、异常值
-- 做统计汇总、分组聚合、趋势分析、对比分析、归因分析
-
-输出：
-
-- 清洗后的数据
-- 汇总表
-- 分析结论
-- 可用于画图的结构化结果
-
-### Skill 3：图表可视化
-
-职责：
-
-- 根据数据类型自动选图
-- 生成 matplotlib 或 seaborn 图表
-- 保存高清图片
-- 返回图片路径或 Base64
-- 生成配套文字摘要
-
-输出：
-
-- 图表文件
-- 图表说明
-- 指标解读
-- 数据摘要
-
-## 为什么不建议做成一个 skill
-
-如果把读取、分析、绘图全放在一个 skill 里，常见问题会变多：
-
-- prompt 过长
-- 代码边界不清
-- 失败时难以定位是读取、分析还是绘图的问题
-- 后续扩展到 Excel / SQL / 多图表时会越来越乱
-
-所以更合理的方式是：
-
-- 先读取和剖析数据
-- 再做分析
-- 最后做图
-
-## 具体开发要求
-
-### 1. 每个 skill 必须定义输入和输出
-
-例如：
-
-- 输入文件路径
-- 目标问题
-- 输出目录
-- 图表格式
-
-以及明确输出：
-
-- 文本结果
-- 中间表
-- 图表文件
-
-### 2. 每个 skill 只做一类事
-
-不要在读取 skill 里混入分析逻辑，也不要在分析 skill 里直接画图。
-
-### 3. skill 内部要可验证
-
-每一步都应该能被检查：
-
-- 是否读到了正确文件
-- 是否识别了字段
-- 是否生成了合法代码
-- 是否保存了图片
-
-### 4. 优先生成结构化中间结果
-
-建议中间结果使用 DataFrame、JSON、CSV、图片文件等明确格式，不要只输出自然语言。
-
-## 推荐的执行流水线
+产品只 staging：
 
 ```text
-用户问题
-  -> CSV 读取 skill
-  -> 数据分析 skill
-  -> 图表可视化 skill
-  -> 结果摘要输出
+skills/chartpilot-run-python/
 ```
 
-## 与底座的关系
+已删除独立的 profile、analysis-plan、fixed-render Skills，避免 Goose 根据相似描述路由到
+不同工具。Trellis 开发 Skills 位于 `.agents/skills/`，不得复制到产品 Goose 状态或 ZIP。
 
-Goose Desktop 底座负责：
+目录结构：
 
-- 对话调度
-- 调用 skill
-- 通过 ChartPilot stdio MCP 调用本地 Python
-- 管理上下文
-- 读取 `runtime/runtime-manifest.json` 并直接启动固定解释器
-- 提供 Provider、会话和图形界面
+```text
+chartpilot-run-python/
+  SKILL.md
+  agents/openai.yaml
+  assets/templates/
+    inspect_csv.py
+    analyze_csv.py
+    render_chart.py
+  references/
+    adaptive-task-contract.md
+    runtime-contract.md
+```
 
-ChartPilot MCP 负责：
+`SKILL.md` 只保留决策流程和工具顺序；详细 JSON 契约放在 `references/`；供 Agent 复制、
+修改并提交的代码放在 `assets/templates/`。
 
-- 只暴露 `chartpilot_profile_csv`、`chartpilot_analyze_data`、`chartpilot_render_chart`
-- 根据任务 ID 把下游调用限制在 `workspace/tasks/`
-- 读取运行时清单并用参数数组直接启动固定解释器
-- 设置受信任读写根、超时、结构化错误和输出上限
+## 两个 MCP 工具
 
-skill 负责：
+ChartPilot stdio MCP 必须且只能暴露：
 
-- 领域能力封装
-- 提示词约束
-- 工具调用模板
-- 输出格式约定
+- `chartpilot_prepare_adaptive_task`
+- `chartpilot_run_task_python`
 
-运行时 Skill 负责：
+`chartpilot_prepare_adaptive_task` 接收 CSV 和 inline prompt 或本地 UTF-8 prompt 文件，创建
+任务目录、保存 `request.md`、记录源文件哈希与运行时清单，并返回 inspect、analysis、render
+三份模板源码。
 
-- 解释器路径和版本验证
-- 参数数组与环境变量契约
-- 任务目录内生成代码的基本结构
-- 执行记录和错误分类
+`chartpilot_run_task_python` 接收任务 ID、阶段和完整 Python 源码。阶段固定为：
 
-业务 Skill 在 Goose 中应优先调用命名 MCP 工具，不应启用 Developer 扩展或通用 shell。
-任何 Skill 都不应自行搜索系统 Python，也不应在目标机运行 pip。
+1. `inspect`
+2. `analysis`
+3. `render`
 
-## 建议的最小实现
+工具把源码保存为 `generated_inspect.py`、`generated_analysis.py` 或
+`generated_chart.py`，再用捆绑解释器和 `-I` 直接执行。每次提交都是完整替换源码，不传
+补丁或 Python 表达式。
 
-第一版先实现以下能力：
+## 模板设计原则
 
-- 读取 CSV
-- 自动生成字段概况
-- 生成 1 个分析结果
-- 自动选择 1 张图
-- 输出图片和摘要
+三份模板必须：
 
-## 后续扩展方向
+- 使用 `--context <task_context.json>` 获取所有路径和运行时信息；
+- 有清楚、范围小的可编辑函数；
+- 可以原样运行，便于冒烟测试；
+- 不包含特定机型、字段、阈值或图表布局；
+- 只使用运行时清单中的依赖；
+- 使用 UTF-8，模块可安全导入，入口返回退出码；
+- 把产物写到 `context.paths.output_dir`，不能假设重试时 staging 路径不变。
 
-- Excel 支持
-- SQL 数据源支持
-- 多图联动
-- 自动归因分析
-- 图表模板库
-- 数据质量报告
+Agent 不应机械保留模板逻辑。遇到嵌套分组、主类别选择、同群基准、复杂派生指标、多区域
+图表或高密度标注时，应重写对应函数，使代码忠实反映 prompt 和数据。
 
-## 验收标准
+## 阶段产物
 
-每个 skill 至少满足：
+### Inspect
 
-- 输入明确
-- 输出明确
-- 可单独运行
-- 可重复执行
-- 出错可定位
+必需 `inspection.json`，schema 为 `chartpilot.inspection/v1`。可选输出 `prepared.csv`。
+该阶段负责字段、质量、语义角色和任务需要的补充探查，不生成 XLSX 中间文件。
+
+### Analysis
+
+必需：
+
+- `result.csv`
+- `adaptive_analysis.json`
+
+后者包含问题、假设、与 CSV 表头一致的 result schema、带 evidence 的 findings 和 chart
+intent。MCP 验证后生成 `analysis_result.json`；所有业务计算由生成代码负责。
+
+### Render
+
+必需：
+
+- 非空 `chart.png`
+- `summary.md`
+- `adaptive_chart.json`
+
+Agent 可以自由使用单图或多区域布局。MCP 检查 PNG 签名、尺寸、文件大小和前景像素，再
+生成 `chart_result.json`。
+
+## 执行记录与失败
+
+每次执行记录保存在 `workspace/tasks/<task-id>/executions/`，包括：
+
+- 阶段和 attempt；
+- 脚本路径、字节数和 SHA-256；
+- runtime ID 与 manifest SHA-256；
+- 开始/结束时间、耗时、退出码；
+- 受限 stdout/stderr；
+- 已提交产物及哈希；
+- 失败错误对象。
+
+阶段输出先写 staging，验证通过后才替换任务目录中的上一版，completion manifest 最后
+安装。源 CSV 在每个阶段前重新校验 SHA-256。失败后必须修改代码再重试。
+
+## 自由度与边界
+
+- 不使用业务操作白名单、AST/import 白名单或固定图表选择器。
+- 不提供旧的确定性备用工具，也不启用 Goose Developer 或通用 shell。
+- 任务代码可使用 runtime manifest 中的全部包，但不得在目标机运行 pip。
+- 代码执行不是安全沙箱，拥有当前 Windows 用户权限；路径组织和产物验证主要服务于
+  可复现性与故障定位。
+- 原始 CSV 保持只读，运行时、源码仓库和依赖锁不得由任务代码修改。
+
+## 开发与验证
+
+修改 Skill 后运行：
+
+```powershell
+runtime\winpython\python\python.exe -I `
+  "$env:USERPROFILE\.codex\skills\.system\skill-creator\scripts\quick_validate.py" `
+  skills\chartpilot-run-python
+```
+
+还必须验证：
+
+- MCP 恰好枚举两个工具；
+- Goose portable 状态只发现一个产品 Skill；
+- 三份模板可原样运行；
+- 匿名变化字段/阈值用例能通过修改模板生成双区域图；
+- SY135 外部案例得到 6,523 台、指定档位分布、96 台高于 25%、0 台高于 50%；
+- 发布 ZIP 不包含已删除 Skills、旧工具、项目元数据或用户 workspace。

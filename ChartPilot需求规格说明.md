@@ -8,7 +8,7 @@
 
 ChartPilot 是一个运行在 Windows 本地环境中的数据分析 Agent。
 
-用户通过自然语言提出分析问题，ChartPilot 读取本地 CSV 文件，优先生成声明式分析计划并通过确定性 Python runner 完成数据检查、清洗、分析和可视化；在现有业务契约无法覆盖且部署策略允许时，才生成并执行任务目录内的受控 Python 代码。最终交付图表图片、分析结论及可追溯的中间结果。
+用户通过自然语言提出分析问题，ChartPilot 读取本地 CSV 文件，由 Agent 基于 inspect、analysis、render 三份轻量模板生成任务特定 Python，使用随包 WinPython 完成数据检查、清洗、分析和可视化。最终交付图表图片、分析结论、完整执行代码及可追溯的中间结果。
 
 产品主要面向不熟悉 SQL 或 Python，但需要快速从业务数据中获得指标、趋势、对比和原因线索的用户。
 
@@ -83,12 +83,12 @@ ChartPilot 是一个运行在 Windows 本地环境中的数据分析 Agent。
 ### FR-04 Python 代码生成与本地执行
 
 - 使用 Python 和 pandas 完成数据读取、清洗、筛选、聚合和统计计算
-- 标准 CSV 链路优先通过白名单声明式计划和固定 runner 执行，不把模型表达式直接交给解释器
-- 在业务契约无法覆盖且部署策略允许时，才在受控任务目录中保存并执行生成的代码
+- 所有 CSV 任务都通过 Agent 修改三份轻量模板并执行任务目录内的完整 Python 源码
+- 不保留白名单声明式计划、固定 runner 或固定图表选择器作为备用路由
 - 所有 Python 必须通过 ChartPilot 随包携带的固定解释器运行，不依赖系统 Python
 - 捕获标准输出、错误信息、退出码和执行耗时
 - 失败后允许根据错误信息进行有限次数的修正与重试
-- 禁止生成与当前分析无关的系统命令、网络请求或目录外写入操作
+- 本阶段不使用 AST/import 白名单或 Python 沙箱；生成代码拥有当前 Windows 用户权限
 - 保存最终执行代码，保证分析过程可审计、可复现
 
 ### FR-05 数据清洗
@@ -142,19 +142,19 @@ ChartPilot 是一个运行在 Windows 本地环境中的数据分析 Agent。
 用户问题 + CSV 路径
         |
         v
-CSV 读取与数据剖析
+准备 request、task context 与三份模板
         |
         v
-字段映射与分析计划
+Agent 修改 inspect 模板并执行数据探查
         |
         v
-生成声明式计划并通过固定 pandas runner 执行
+Agent 修改 analysis 模板并执行任务特定计算
         |
         v
-结果校验与必要的有限重试
+验证结果契约并按需修改代码重试
         |
         v
-生成图表、结果表和文字摘要
+Agent 修改 render 模板并生成图表和摘要
         |
         v
 保存代码、日志和任务元数据
@@ -162,17 +162,12 @@ CSV 读取与数据剖析
 
 ## 7. Skill 边界
 
-MVP 建议拆分为三个业务 Skill：
+产品只提供 `chartpilot-run-python` 一个自适应 Skill，避免多个相似 Skill 导致错误路由。
+Skill 管理 prompt+CSV 准备、三份可编辑模板、阶段顺序、产物契约和视觉迭代规则。
 
-1. CSV 读取与数据抓取 Skill：负责文件读取、字段识别、数据剖析和质量检查。
-2. 数据分析 Skill：负责分析计划、数据清洗、指标计算、维度拆解和结构化结果生成。
-3. 图表可视化 Skill：负责图表选型、绘图、图片校验和图表摘要。
-
-Agent 底座负责对话、任务调度、代码执行、错误重试和上下文管理。Skill 负责限定领域流程、输入输出格式及质量标准。
-
-三个 Skill 应通过结构化文件或对象传递数据，不依赖自然语言文本作为唯一的中间接口。
-
-另设 `chartpilot-run-python` 基础设施 Skill，负责固定运行时定位、进程参数协议、环境变量清理、通用生成代码边界和执行审计。该 Skill 不改变三个业务 Skill 的职责边界。
+Goose 底座负责对话和模型 Provider；ChartPilot MCP 只暴露任务准备与任务 Python 执行两个
+工具，负责运行时定位、环境清理、staging、超时、执行记录和产物验证。字段语义、业务计算、
+阈值和图表布局由 Agent 编写的阶段代码负责。
 
 ## 8. 非功能要求
 
@@ -187,11 +182,11 @@ Agent 底座负责对话、任务调度、代码执行、错误重试和上下�
 
 - 默认只允许读取用户指定文件及工作目录
 - 默认只允许写入指定输出目录
-- 除 LLM API 外禁止程序主动访问其他网络地址
+- 本阶段不实现生成 Python 的网络隔离；需要限制时由部署环境的网络策略承担
 - API Key 不写入日志、生成代码或分析结果
 - 发送给 LLM 的上下文应遵循最小化原则；允许范围由部署配置决定
 - 所有生成代码和执行记录均保留审计信息
-- 默认 Goose 配置不得启用通用 Developer 扩展；标准 CSV 流程只使用三个受限 MCP 工具
+- 默认 Goose 配置不得启用通用 Developer 扩展；标准 CSV 流程只使用两个自适应 MCP 工具
 - Goose 与 WinPython 均不得被描述为 Windows 操作系统沙箱
 
 ### 8.3 稳定性
@@ -214,18 +209,19 @@ Agent 底座负责对话、任务调度、代码执行、错误重试和上下�
 workspace/
   tasks/
     <task_id>/
-      input_profile.json
-      analysis_plan.json
+      request.md
+      task_context.json
+      generated_inspect.py
+      inspection.json
       generated_analysis.py
-      cleaned_data.csv
       result.csv
+      analysis_result.json
+      generated_chart.py
       chart.png
+      chart_result.json
       summary.md
-      task.json
-      execution.log
+      executions/
 ```
-
-其中 `cleaned_data.csv` 仅在发生清洗且确有保存必要时生成。
 
 ## 10. MVP 范围外事项
 
@@ -256,7 +252,7 @@ workspace/
 8. 能输出包含关键数字、口径和主要发现的中文摘要。
 9. 能保存结果表、生成代码和执行日志，并可根据这些文件复现计算。
 10. 遇到字段缺失、空数据或代码执行失败时，能够给出可理解的错误信息，且不修改原始 CSV。
-11. 分析过程中不向非指定地址发起网络请求。
+11. 默认模板不主动访问网络；本阶段不把网络隔离作为生成代码验收项。
 12. API Key 和原始数据内容不出现在日志中。
 
 ## 12. 当前待确认的产品决策
@@ -266,10 +262,10 @@ workspace/
 - LLM API 采用哪一种协议及模型，上下文长度和工具调用能力要求
 - 允许发送给 LLM 的数据范围：仅字段元数据、脱敏样例，还是受控的小规模原始数据
 - MVP 支持的最大 CSV 文件大小和最长任务执行时间
-- 默认 MCP 之外是否需要提供任意生成 Python 的高级模式，以及对应审批方式
 - 后续是否需要在 MCP 结果中直接返回图片内容，而不是当前 PNG 路径与哈希
 
 已确定：Agent 底座采用 Goose Desktop `v1.43.0` Windows x64 无 CUDA ZIP；第一版提供
-图形界面；标准 CSV 流程不开放任意 Python 或通用 shell。
+图形界面；标准 CSV 流程通过两个 MCP 工具执行 Agent 编写的任务 Python，不提供旧的确定性
+工具或通用 shell。该执行路径不是操作系统沙箱。
 
 这些决策确定后，应补充到本文档并转化为可测试的配置项或验收指标。

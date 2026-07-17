@@ -3,29 +3,25 @@
 English | [简体中文](README.zh-CN.md)
 
 ChartPilot is a local-first Windows CSV analysis Agent built on Goose Desktop. It ships with
-pinned Goose and WinPython runtimes and performs CSV profiling, declarative analysis, and PNG
-rendering locally without relying on system Python or sending data-processing work to a remote
-service.
+pinned Goose and WinPython runtimes, adapts Python templates to each natural-language request and
+CSV, and performs analysis and PNG rendering locally without system Python.
 
 > [!IMPORTANT]
-> Goose provides the graphical Agent shell and model-provider integration. ChartPilot exposes
-> only three deterministic CSV tools through its default MCP extension; Goose's generic
-> Developer extension is not enabled by default.
+> ChartPilot exposes exactly two adaptive MCP tools: prepare a prompt-plus-CSV task, then execute
+> Agent-authored stage Python. Goose's generic Developer extension is not enabled by default.
 
 ## Core capabilities
 
-- Detect UTF-8, UTF-8 BOM, GBK/GB18030, delimiters, field types, missing values, duplicates,
-  and candidate field roles.
-- Execute allowlisted cleaning, filtering, time bucketing, aggregation, Top N, share, and
-  percentage-change operations from a versioned analysis plan.
-- Render line, bar, donut, and scatter PNG charts from SHA-256-bound `result.csv` artifacts
-  without recomputing business metrics during charting.
-- Use a pinned WinPython CPython 3.13.13 Windows x64 runtime instead of system `python` or
-  `py.exe`.
+- Start from compact inspect, analysis, and render templates and modify them for the actual
+  schema, business logic, thresholds, and presentation request.
+- Handle nested and domain-specific operations directly with pandas/numpy instead of routing
+  through a fixed operation vocabulary.
+- Build task-specific single- or multi-panel PNG reports with matplotlib/Pillow and Chinese font
+  support.
+- Use pinned WinPython CPython 3.13.13 Windows x64 instead of system `python` or `py.exe`.
 - Use pinned Goose Desktop 1.43.0 Windows x64 without CUDA, Node.js, Rust, or an installer.
-- Protect source files, return structured errors, and commit multi-file artifact sets
-  transactionally.
-- Support Chinese paths, headers, chart labels, and offline execution.
+- Preserve exact generated source, runtime identity, bounded process output, execution status,
+  artifact hashes, and task-local results.
 
 ## Repository structure
 
@@ -40,44 +36,34 @@ ChartPilot/
 ├── scripts/agent/
 ├── scripts/runtime/
 ├── skills/
-│   ├── chartpilot-run-python/
-│   ├── chartpilot-profile-csv/
-│   ├── chartpilot-analyze-data/
-│   └── chartpilot-render-chart/
+│   └── chartpilot-run-python/
 ├── ChartPilot需求规格说明.md
 ├── Skill开发说明.md
 └── Windows离线部署方案.md
 ```
 
-`runtime/`, `wheelhouse/`, `build/`, and `dist/` are generated locally and excluded from Git.
+`runtime/`, `wheelhouse/`, `workspace/`, `build/`, and `dist/` are generated locally and excluded
+from Git.
 
 ## Build the portable runtimes
 
-The build host needs Windows 10/11 x64 and PowerShell 5.1 or later. A preinstalled Python is
-not required. ChartPilot pins `WinPython64-3.13.13.0dot.zip` from WinPython release
+The build host needs Windows 10/11 x64 and PowerShell 5.1 or later. A preinstalled Python is not
+required. ChartPilot pins `WinPython64-3.13.13.0dot.zip` from WinPython release
 `17.4.20260511final` and verifies its byte size and SHA-256 before extraction.
-
-Build the runtime:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\build-runtime.ps1
 ```
 
-This creates `runtime/`, installs dependencies from the hash-locked wheelhouse, and runs
-dependency checks, CLI smoke tests, regression tests, and a CSV-to-PNG end-to-end test.
-
-ChartPilot pins the non-CUDA `Goose-win32-x64.zip` asset from Goose release `v1.43.0`.
-Build it from an already downloaded archive:
+ChartPilot also pins the non-CUDA `Goose-win32-x64.zip` asset from Goose release `v1.43.0`:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent\build-goose.ps1 `
   -SourceArchive "C:\path\to\Goose-win32-x64.zip"
 ```
 
-Omit `-SourceArchive` to download the locked asset. Both paths verify the exact byte size and
-SHA-256 in `goose.lock.json` before extraction.
-
-Refresh the full dependency lock only after changing `requirements.txt`:
+Omit `-SourceArchive` to download the locked asset. Refresh the dependency lock only after
+changing `requirements.txt`:
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\update-lock.ps1
@@ -87,97 +73,55 @@ Review every version and hash change in `requirements.runtime.lock.txt`.
 
 ## Start ChartPilot
 
-Run `Start-ChartPilot.cmd`. The launcher validates both runtime manifests, initializes Goose
-state under `workspace/goose`, stages only the four ChartPilot Skills, and starts Goose Desktop.
-Configure a supported model Provider in Goose on first use. Provider credentials are managed by
-Goose and are never written to ChartPilot task artifacts.
+Run `Start-ChartPilot.cmd`. The launcher validates both runtime manifests, initializes portable
+Goose state under `workspace/goose`, stages the single ChartPilot adaptive Skill, and starts
+Goose Desktop. Configure a model Provider in Goose on first use.
 
-The launcher allows CSV reads beneath the ChartPilot directory and the current Windows user
-profile by default. Writes remain beneath `workspace/tasks/`.
+The launcher allows reads beneath the ChartPilot directory and current Windows user profile by
+default. Generated task code and artifacts are stored beneath `workspace/tasks/`.
 
-## Run the pipeline
+## Run the adaptive workflow
 
-Use the bundled interpreter for every command:
-
-```powershell
-$python = ".\runtime\winpython\python\python.exe"
-```
-
-Profile a CSV:
-
-```powershell
-& $python -I .\skills\chartpilot-profile-csv\scripts\profile_csv.py "data\sales.csv" `
-  --task-id demo-001 `
-  --output-dir "workspace\tasks\demo-001"
-```
-
-Create `analysis_plan.json` according to the
-[analysis contract](skills/chartpilot-analyze-data/references/contracts.md), then run:
-
-```powershell
-& $python -I .\skills\chartpilot-analyze-data\scripts\run_analysis.py `
-  --profile "workspace\tasks\demo-001\input_profile.json" `
-  --plan "workspace\tasks\demo-001\analysis_plan.json" `
-  --output-dir "workspace\tasks\demo-001"
-```
-
-Render the saved result:
-
-```powershell
-& $python -I .\skills\chartpilot-render-chart\scripts\render_chart.py `
-  --analysis-result "workspace\tasks\demo-001\analysis_result.json"
-```
-
-Artifact flow:
+Give Goose a request and CSV path, or a local UTF-8 `.md`/`.txt` request file and CSV path. The
+Skill calls `chartpilot_prepare_adaptive_task`, reviews the returned task context and three
+templates, modifies each stage when useful, then calls `chartpilot_run_task_python` for
+`inspect`, `analysis`, and `render`.
 
 ```text
-input_profile.json
-  -> analysis_plan.json
-  -> result.csv + analysis_result.json
-  -> chart.png + chart_result.json + summary.md
+request.md + task_context.json + generated_inspect.py
+  -> inspection.json
+  -> generated_analysis.py + result.csv + analysis_result.json
+  -> generated_chart.py + chart.png + chart_result.json + summary.md
 ```
 
-## Validate and package
+The Agent should iterate on generated code when calculations, labels, chart composition, or
+presentation do not satisfy the request. There is no deterministic alternate route.
 
-Run the complete validation suite:
+## Validate and package
 
 ```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\test-runtime.ps1
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent\test-agent.ps1
-```
-
-Create the release ZIP:
-
-```powershell
 powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\package-release.ps1
 ```
 
-The output is `dist/ChartPilot-win-x64-goose-py3.13.zip`. Perform a final manual acceptance
-pass on clean, non-admin Windows 10 and Windows 11 hosts before release.
+The output is `dist/ChartPilot-win-x64-goose-py3.13.zip`. The optional SY135 reference acceptance
+test accepts its external case directory through `scripts/agent/test-sy135-adaptive.py`; it does
+not package the source data or manual artifacts.
 
-## Agent runtime contract
+## Runtime and security boundaries
 
-Goose loads the ChartPilot Skills through Summon and calls the bundled stdio MCP server. The MCP
-server validates `runtime/runtime-manifest.json`, launches only the three deterministic business
-CLIs with argument arrays, and addresses downstream stages by task ID. The direct CLI contracts
-remain available for diagnostics. Arbitrary generated Python is not exposed by the default MCP
-surface.
-
-## Security boundaries
-
-- Bundled business tools do not make network requests or execute model-provided Python
-  expressions.
-- Source files and upstream artifacts are SHA-256-bound and revalidated downstream.
-- CSV samples can be omitted or redacted for sensitive-looking fields.
-- Target machines must not run online pip installs; dependencies change only during a
-  hash-reviewed build.
-- API keys must never be written to plans, generated code, logs, or results.
-- The default Goose configuration enables only Summon and the ChartPilot MCP extension, uses
-  `smart_approve`, and disables Goose telemetry.
-- Goose and WinPython are not Windows operating-system sandboxes. The MCP bridge limits its own
-  paths, tools, subprocesses, and timeouts; deployment ACL and network policy remain external.
-- Do not use Goose's self-update command in the pinned distribution. Upgrade `goose.lock.json`
-  and rebuild the complete Goose runtime deliberately.
+- The MCP bridge validates `runtime/runtime-manifest.json`, stores exact submitted code, invokes
+  bundled WinPython with argument arrays, stages outputs, and records every attempt.
+- Generated task Python is intentionally flexible and is not checked against an operation or
+  import allowlist.
+- Source files are SHA-256-bound and checked before every stage. Stage completion manifests are
+  installed only after artifact validation.
+- Target machines do not run online pip; dependencies change only during a hash-reviewed build.
+- Goose and WinPython are not Windows operating-system sandboxes. Generated code uses the current
+  user's permissions; deployment ACL and network policy remain external.
+- Do not use Goose self-update in the pinned distribution. Upgrade `goose.lock.json` and rebuild
+  deliberately.
 
 ## Project documents
 
@@ -188,6 +132,6 @@ surface.
 ## License
 
 The project has not selected a software license. Public availability does not grant rights to
-use, modify, or redistribute the repository beyond applicable law. The generated
-`runtime/third-party-licenses.json` records Python distribution licenses. The bundled Goose
+use, modify, or redistribute the repository beyond applicable law. Generated
+`runtime/third-party-licenses.json` records Python distribution licenses. Bundled Goose
 Apache-2.0 and Chromium notices are retained under `runtime/goose/`.

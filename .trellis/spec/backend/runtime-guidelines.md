@@ -1,52 +1,41 @@
 # Portable Runtime Guidelines
 
-## Scenario: Build And Invoke The ChartPilot Python Runtime
+## Scenario: Build And Invoke WinPython
 
-### 1. Scope / Trigger
+### Scope
 
-Use this contract when changing the pinned Python version, direct dependencies, runtime build
-scripts, release packaging, Agent process invocation, or file durability behavior on Windows.
+Use this contract when changing Python versions, dependencies, templates, process invocation,
+runtime tests, or release packaging. Generated `runtime/`, `wheelhouse/`, `workspace/`, `build/`,
+and `dist/` directories remain outside Git.
 
-The generated `runtime/`, `wheelhouse/`, `build/`, and `dist/` directories are local artifacts.
-Commit their source contracts and scripts, not the generated binaries.
+### Source Contracts
 
-### 2. Signatures
+- `runtime.lock.json`: WinPython asset, size/hash, CPython version/architecture, interpreter path,
+  dependency files, and child environment.
+- `requirements.txt`: exact direct pins.
+- `requirements.runtime.lock.txt`: complete CPython 3.13 Windows x64 wheel set with SHA-256.
+- `runtime/runtime-manifest.json`: installed identity, distributions, wheels, hashes, environment,
+  and health.
+- `release.files.json`: explicit release root-file allowlist.
 
-Supported build commands:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\update-lock.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\build-runtime.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\test-runtime.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\runtime\package-release.ps1
-```
-
-Canonical interpreter path:
+Canonical interpreter:
 
 ```text
 runtime/winpython/python/python.exe
 ```
 
-Business CLI processes use this shape:
+Invoke task code only as an argument array:
 
 ```text
-<absolute-bundled-python> -I <absolute-script> <argument-array-items...>
+<absolute-bundled-python> -I <absolute-task-script> --context <absolute-context-json>
 ```
 
-### 3. Contracts
+Never search `PATH`, `py.exe`, the registry, Conda, venvs, or user site-packages. Never install a
+dependency on the target machine.
 
-Source of truth:
+### Child Environment
 
-- `runtime.lock.json`: upstream release URL, byte size, SHA-256, Python version/architecture,
-  interpreter-relative path, dependency files, and child environment policy.
-- `requirements.txt`: exact direct dependency pins.
-- `requirements.runtime.lock.txt`: exact direct and transitive Windows x64 CPython 3.13 wheels,
-  each with SHA-256.
-- `release.files.json`: explicit root-file allowlist for release packaging.
-- `runtime/runtime-manifest.json`: generated installed-runtime identity, packages, wheels, hashes,
-  environment contract, and health results.
-
-Child environment:
+Apply the runtime manifest:
 
 ```text
 set: PYTHONNOUSERSITE=1, PYTHONUTF8=1, PYTHONDONTWRITEBYTECODE=1, MPLBACKEND=Agg
@@ -54,229 +43,221 @@ unset: PYTHONHOME, PYTHONPATH, VIRTUAL_ENV, CONDA_PREFIX, CONDA_DEFAULT_ENV
 workspace paths: HOME, TEMP, TMP, MPLCONFIGDIR, PYTHONPYCACHEPREFIX
 ```
 
-Build scripts must remain ASCII so Windows PowerShell 5.1 does not misdecode source literals.
-Store non-ASCII release filenames in UTF-8 JSON and read them with an explicit JSON parser.
+Build PowerShell must stay ASCII for Windows PowerShell 5.1. Store non-ASCII filenames in UTF-8
+JSON or Python source.
 
-### 4. Validation & Error Matrix
+### Required Validation
 
-| Condition | Required behavior |
-| --- | --- |
-| Upstream byte size or SHA-256 mismatch | Stop before extraction; keep prior verified cache/runtime. |
-| Source distribution or wrong wheel platform | Reject lock refresh. |
-| Lock missing or wheel hash mismatch | Stop build before installation. |
-| Python implementation/version/architecture mismatch | Fail runtime health check. |
-| Runtime manifest path escapes project root | Reject invocation; never search system Python. |
-| Dependency import or `pip check` failure | Keep staging; do not replace the prior runtime. |
-| CLI/unit/end-to-end test failure | Keep staging and prior runtime unchanged. |
-| Final runtime placement failure | Restore the complete prior runtime. |
-| Release allowlist entry missing | Fail packaging. |
-| Windows `os.fsync()` uses a read-only descriptor | Treat as a bug; reopen the created file as `r+b`. |
+- Verify WinPython ZIP size/SHA-256 and CPython 3.13.13 x64 identity.
+- Regenerate dependency lock from wheelhouse and compare to the committed lock.
+- Run `pip check` and import pandas, numpy, matplotlib, Pillow, mcp, and PyYAML.
+- Run all three adaptive template `--help` commands with bundled Python.
+- Run Agent unit tests and adaptive CSV-to-PNG smoke.
+- Validate the single product Skill with `quick_validate.py`.
+- Inspect release ZIP required/forbidden files and third-party licenses.
 
-### 5. Good / Base / Bad Cases
+If build/install/tests fail, keep staging and the prior runtime. Replace the complete runtime only
+after every check succeeds; restore it on placement failure.
 
-- Good: refresh a reviewed hash lock, build in staging, run all checks, then replace `runtime/`.
-- Base: rebuild from an unchanged lock and cached verified ZIP/wheelhouse without dependency drift.
-- Bad: call `python` from `PATH`, run online pip on the target machine, accept an unverified ZIP,
-  install an sdist, or package every root file with a wildcard.
-
-### 6. Tests Required
-
-- Assert the WinPython asset matches both expected bytes and SHA-256.
-- Regenerate a lock from `wheelhouse/` and compare it byte-for-byte with the committed lock.
-- Assert `pip check` and imports of pandas, matplotlib, and Pillow succeed.
-- Assert all three business CLIs support `--help` through the bundled interpreter.
-- Run analysis regression tests with the bundled interpreter.
-- Run one profile -> analysis -> render test using Chinese content and a data path with spaces.
-- Assert `runtime-manifest.json` reports CPython 3.13.13, 64-bit, health `success`, and matching
-  asset/dependency hashes.
-- Validate every Skill with the skill-creator validator.
-- Inspect the release ZIP inventory for required files and forbidden project metadata/cache roots.
-- Regression-test `fsync_path()` on an existing file under Windows CPython 3.13.
-
-### 7. Wrong Vs Correct
-
-#### Wrong: interpreter selection
-
-```text
-python skills/chartpilot-analyze-data/scripts/run_analysis.py ...
-```
-
-This can execute an unknown system interpreter and user site-packages.
-
-#### Correct: interpreter selection
-
-```text
-C:\ChartPilot\runtime\winpython\python\python.exe -I C:\ChartPilot\skills\chartpilot-analyze-data\scripts\run_analysis.py ...
-```
-
-Resolve both paths beneath a trusted project root and pass arguments through a process array.
-
-#### Wrong: Windows durability
-
-```python
-with path.open("rb") as handle:
-    os.fsync(handle.fileno())
-```
-
-CPython 3.13 on Windows can raise `OSError: [Errno 9] Bad file descriptor` because the descriptor
-is read-only.
-
-#### Correct: Windows durability
-
-```python
-with path.open("r+b") as handle:
-    os.fsync(handle.fileno())
-```
-
-Text/JSON writers may fsync their already writable handles directly. Reopen pandas-generated CSV
-artifacts as `r+b` before fsync.
-
-## Scenario: Build And Launch The Portable Goose Agent Base
+## Scenario: Adaptive Prompt-Plus-CSV Execution
 
 ### 1. Scope / Trigger
 
-Use this contract when changing the Goose version, agent launcher, portable Goose configuration,
-Skill staging, ChartPilot MCP tools, Agent tests, or release packaging.
-
-Goose is the graphical/model-provider base. It must not replace the deterministic Python business
-CLIs or turn the standard CSV path into general shell/code execution.
+Apply this contract whenever a change touches prompt-plus-CSV routing, the ChartPilot MCP bridge,
+task templates, product Skills, stage artifacts, or generated-code execution. Every request uses
+one adaptive route; there is no deterministic, simple-task, or compatibility route.
 
 ### 2. Signatures
 
-Supported Agent commands:
-
-```powershell
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent\build-goose.ps1 `
-  -SourceArchive "C:\path\to\Goose-win32-x64.zip"
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent\test-agent.ps1
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\agent\start-chartpilot.ps1
-```
-
-Root user entrypoint:
+The product stages exactly one Skill:
 
 ```text
-Start-ChartPilot.cmd
+chartpilot-run-python
 ```
 
 The stdio MCP server exposes exactly:
 
 ```text
-chartpilot_profile_csv(source_path, task_id?, sample_mode="redacted")
-chartpilot_analyze_data(task_id, analysis_plan)
-chartpilot_render_chart(task_id, font_path?)
+chartpilot_prepare_adaptive_task(source_path, request_text?, request_path?, task_id?)
+chartpilot_run_task_python(task_id, stage, source_code)
 ```
+
+Do not reintroduce `chartpilot_profile_csv`, `chartpilot_analyze_data`,
+`chartpilot_render_chart`, their three Skills, their deterministic runners, an analysis-plan DSL,
+or a fixed chart renderer. There is no simple-task or compatibility route.
 
 ### 3. Contracts
 
-Source of truth:
+Valid execution stages are `inspect`, `analysis`, and `render`, in order. Invoke submitted source
+only with the manifest-resolved interpreter and an argument array:
 
-- `goose.lock.json`: Goose `v1.43.0`, non-CUDA Windows x64 Desktop asset, byte size,
-  SHA-256, archive root, entrypoints, and required files.
-- `runtime/goose-manifest.json`: generated critical-file hashes, CLI version, Authenticode
-  observation, environment names, and health status.
-- `agent/config/goose-config.template.json`: initial `smart_approve`, telemetry, Summon, and
-  constrained ChartPilot stdio extension settings.
-- `agent/mcp/chartpilot_mcp.py`: the only default bridge from Goose to business CLIs.
+```text
+<absolute-bundled-python> -I <absolute-task-script> --context <absolute-context-json>
+```
 
-Required process environment:
+#### Skill Resources
+
+`skills/chartpilot-run-python/` owns:
+
+```text
+SKILL.md
+agents/openai.yaml
+assets/templates/inspect_csv.py
+assets/templates/analyze_csv.py
+assets/templates/render_chart.py
+references/adaptive-task-contract.md
+references/runtime-contract.md
+```
+
+Keep SKILL instructions concise and high-freedom. Templates are editable starting points, must run
+unchanged, and must not contain case-specific fields, thresholds, paths, or layout.
+
+#### Task Preparation
+
+Preparation accepts one CSV and exactly one inline request or bounded UTF-8 `.md`/`.txt` request
+file. It validates configured read roots, creates a unique task, persists exact `request.md`, and
+writes `task_context.json` with source hash/metadata, runtime inventory, paths, and template
+hashes. It returns all three template sources. It performs no business analysis.
+
+#### Stage Execution
+
+Stages are `inspect`, `analysis`, and `render`, in order. For every attempt:
+
+1. Save exact source as `generated_inspect.py`, `generated_analysis.py`, or
+   `generated_chart.py`.
+2. Recheck the source CSV SHA-256.
+3. Create an attempt-specific staging directory and context whose output path targets staging.
+4. Invoke bundled Python with `-I`, finite timeout, bounded stdout/stderr, and sanitized child
+   environment.
+5. Validate only task identity and stage interoperability artifacts.
+6. Replace prior outputs transactionally, with completion manifest last.
+7. Append an execution record containing script/runtime hashes, timing, exit status, output,
+   errors, and artifact hashes.
+
+Inspect requires `inspection.json` and may emit `prepared.csv`. Analysis requires `result.csv` and
+`adaptive_analysis.json`; the bridge creates `analysis_result.json`. Render requires nonblank
+`chart.png`, nonempty `summary.md`, and `adaptive_chart.json`; the bridge creates
+`chart_result.json`.
+
+The bridge does not validate business correctness. Prompt-specific tests and Agent reasoning own
+field mapping, calculations, thresholds, findings, and visual design.
+
+#### Risk Posture
+
+Generated Python is the intended execution route. Do not apply a business operation allowlist,
+AST/import allowlist, or Python sandbox in the current product. Generated code runs with the
+current Windows user's permissions and may use every package in the runtime manifest.
+
+Path organization, hashes, staging, timeouts, output bounds, and records provide reproducibility
+and diagnostics, not an operating-system security boundary. Deployment ACL and network policy are
+external. Do not describe Goose or WinPython as a sandbox.
+
+### 4. Validation & Error Matrix
+
+| Condition | Required result |
+| --- | --- |
+| Runtime roots or manifest are missing/invalid | `RUNTIME_CONFIGURATION_MISSING` or `RUNTIME_CONFIGURATION_INVALID` |
+| CSV/request is outside configured read roots | `PATH_NOT_ALLOWED` |
+| Both or neither request forms are supplied | `INVALID_REQUEST` |
+| Requested task already exists | `TASK_EXISTS` |
+| Stage is not inspect/analysis/render | `INVALID_STAGE` |
+| Source hash differs from preparation | `SOURCE_CHANGED` before execution |
+| Analysis/render prerequisite is absent | `STAGE_PREREQUISITE_MISSING` |
+| Process times out, floods output, or exits nonzero | `PROCESS_TIMEOUT`, `PROCESS_OUTPUT_TOO_LARGE`, or `PYTHON_EXECUTION_FAILED` |
+| Required stage artifact is absent, malformed, or blank | Artifact-specific error or `INVALID_STAGE_OUTPUT`; do not commit staged outputs |
+
+Every attempted process execution writes an append-only record. Commit completion manifests last,
+after all outputs validate.
+
+### 5. Good/Base/Bad Cases
+
+- Good: adapt all three templates to a new schema and request, then emit evidence-backed analysis
+  plus a task-specific multi-panel chart that passes every bridge contract.
+- Base: run the unchanged compact templates on their documented minimal CSV contract and produce
+  every required artifact.
+- Bad: call system `python`, install packages at task time, edit the source CSV, embed fixed
+  business fields/thresholds in the bridge, or expose a removed deterministic tool/Skill.
+
+### 6. Tests Required
+
+- Unit: request-form validation, read-root rejection, source-hash rejection, failed execution
+  records, stage prerequisites, and output validators.
+- Contract: MCP `tools/list` returns exactly the two signatures above; Goose stages exactly one
+  product Skill and cleans stale removed Skill directories.
+- Template: all three templates pass `--help`, run unchanged on the minimal contract, and can be
+  customized for the anonymous changed-schema/threshold fixture.
+- End to end: the external SY135 case asserts 59,278 source rows, 6,523 machines, exact gear
+  totals, 96 above 25%, zero above 50%, and two populated chart regions.
+- Release: assert `pip check`, imports, locks, licenses, two Skill copies, six template copies,
+  zero removed Skill entries, and zero forbidden metadata/cache entries.
+
+### 7. Wrong vs Correct
+
+Wrong:
+
+```python
+subprocess.run(["python", script_path])
+# Or register a fixed business tool for requests judged to be simple.
+```
+
+Correct:
+
+```python
+subprocess.Popen(
+    [str(context.python), "-I", str(script_path), "--context", str(attempt_context)],
+    shell=False,
+    env=context.child_environment(),
+)
+# Keep only chartpilot_prepare_adaptive_task and chartpilot_run_task_python.
+```
+
+## Scenario: Portable Goose Base
+
+### Source Contracts
+
+- `goose.lock.json`: Goose v1.43.0 non-CUDA Windows x64 asset and hashes.
+- `runtime/goose-manifest.json`: generated critical-file hashes, version, signature observation,
+  environment names, and health.
+- `agent/config/goose-config.template.json`: Summon plus the two-tool ChartPilot stdio extension.
+- `agent/mcp/chartpilot_mcp.py`: only product bridge.
+
+Required environment:
 
 ```text
 GOOSE_PATH_ROOT=<project>/workspace/goose
 CHARTPILOT_ROOT=<trusted project root>
 CHARTPILOT_WORKSPACE_ROOT=<project>/workspace
-CHARTPILOT_ALLOWED_READ_ROOTS=<os.pathsep-separated trusted roots>
+CHARTPILOT_ALLOWED_READ_ROOTS=<os.pathsep-separated roots>
 ```
 
-Goose `v1.43.0` portable Skill discovery uses
-`GOOSE_PATH_ROOT/config/skills`, because that maps to
-`Paths::config_dir().join("skills")`. Do not assume that
-`GOOSE_PATH_ROOT/.agents/skills` replaces `~/.agents/skills`; Goose's
-`global_skills_dir()` still resolves the real user home. Project
-`.agents/skills` also has higher discovery precedence, so launch product sessions from the
-isolated `workspace/session` directory rather than the repository root.
+Goose v1.43.0 discovers portable product Skills at `GOOSE_PATH_ROOT/config/skills`. Launch from
+isolated `workspace/session`; repository `.agents/skills` has higher discovery precedence and must
+not leak Trellis development Skills into product sessions.
 
-The launcher may update only the managed ChartPilot extension paths. It must preserve Provider
-configuration, credentials, unrelated extensions, and an explicit user choice to disable the
-ChartPilot extension.
+Initialization must:
 
-The MCP server clears proxy and credential-shaped environment variables before importing or
-running business tools. It invokes the absolute bundled interpreter with `-I`, argument arrays,
-fixed scripts, trusted roots, bounded output, and a timeout. It never exposes shell, pip,
-network, or arbitrary-Python tools.
+- stage only `chartpilot-run-python`;
+- remove stale `chartpilot-profile-csv`, `chartpilot-analyze-data`, and
+  `chartpilot-render-chart` directories;
+- preserve Provider config, credentials, unrelated extensions, and the user's explicit decision
+  to disable the ChartPilot extension;
+- replace populated Skill directories through backup/move/restore, not `os.replace`.
 
-### 4. Validation & Error Matrix
+The MCP server removes proxy- and credential-shaped environment variables before importing or
+executing task code. Goose Developer and generic shell remain disabled; adaptive source is passed
+only through the ChartPilot MCP tool.
 
-| Condition | Required behavior |
-| --- | --- |
-| Goose archive size/hash mismatch | Stop before ZIP inspection or extraction. |
-| Rooted, traversal, duplicate, or out-of-root ZIP entry | Reject archive and retain prior runtime. |
-| Required Goose file or CLI version missing | Fail staged build; do not replace runtime. |
-| Critical extracted file hash changes | Launcher refuses to start the unpinned runtime. |
-| Existing Goose YAML is malformed | Fail initialization without overwriting config. |
-| CSV is outside trusted read roots | MCP returns an error before profiling. |
-| Invalid task ID or task path escape | MCP returns an error before reading/writing artifacts. |
-| Business CLI timeout or oversized output | Kill the process and return a bounded structured error. |
-| Business CLI structured error | Preserve it under the MCP bridge error `details.cause`. |
-| Provider is not configured | Goose UI/CLI asks for Provider setup; do not inject credentials. |
-| Nonempty Skill directory refresh on Windows | Move old directory to backup, use `shutil.move`, restore on failure. |
+### Required Validation
 
-### 5. Good / Base / Bad Cases
+- Verify Goose archive size/hash, safe ZIP paths, critical hashes, CLI version, and Desktop file.
+- Initialize twice and preserve Provider/user extension choices.
+- From `workspace/session`, assert exactly one ChartPilot Skill and no Trellis/removed Skills.
+- Initialize MCP, assert exactly two tools, and reject input outside read roots.
+- Execute unchanged templates and a customized synthetic multi-panel report through MCP.
+- Run the opt-in external SY135 case and assert 59,278 rows, 6,523 machines, exact per-gear totals,
+  96 above 25%, zero above 50%, and two populated chart regions.
+- Inspect release ZIP for both runtimes, one Skill in both product locations, three templates,
+  launcher/MCP/licenses, and absence of removed Skills, project metadata, caches, wheelhouse, and
+  workspace.
 
-- Good: verify a local upstream ZIP, build in staging, hash critical files, initialize portable
-  config, discover only ChartPilot Skills, and pass MCP CSV-to-PNG integration before packaging.
-- Base: rebuild from unchanged locks and preserve an existing Provider configuration and disabled
-  extension preference.
-- Bad: run Goose from the repository root and leak Trellis Skills into the product session; stage
-  Skills under `GOOSE_PATH_ROOT/.agents/skills`; enable Developer by default; accept Goose
-  self-update drift; or invoke `python`/`goose` through `PATH`.
-
-### 6. Tests Required
-
-- Verify the Goose archive byte size and SHA-256 and reject a synthetic traversal ZIP.
-- Verify `runtime/goose-manifest.json` and every recorded critical file hash.
-- Assert the bundled Goose CLI reports the locked version and the Desktop binary is present.
-- Initialize twice; preserve Provider data and a disabled ChartPilot extension while refreshing
-  managed absolute paths.
-- From `workspace/session`, assert Goose lists all four ChartPilot Skills and no Trellis Skills.
-- Initialize MCP, assert exactly three tools, and reject a CSV outside allowed roots.
-- Run profile -> analysis -> render through MCP and assert a valid PNG signature.
-- Inspect the release ZIP for both runtimes, launcher, MCP, four `.agents/skills`, licenses, and
-  absence of project metadata, caches, wheelhouse, and workspace.
-
-### 7. Wrong Vs Correct
-
-#### Wrong: portable Skill location
-
-```text
-<GOOSE_PATH_ROOT>/.agents/skills/chartpilot-profile-csv
-```
-
-This location is not the `GOOSE_PATH_ROOT`-redirected global Skill directory in Goose `v1.43.0`.
-
-#### Correct: portable Skill location
-
-```text
-<GOOSE_PATH_ROOT>/config/skills/chartpilot-profile-csv
-```
-
-Launch with `workspace/session` as the Goose working directory so repository-only `.agents`
-content cannot shadow or pollute the product Skill set.
-
-#### Wrong: replace a populated Skill directory on Windows
-
-```python
-os.replace(staged_skill_dir, installed_skill_dir)
-```
-
-This can raise `PermissionError: [WinError 5]` for nonempty directories.
-
-#### Correct: backup, move, restore
-
-```python
-shutil.move(str(installed_skill_dir), str(backup_dir))
-try:
-    shutil.move(str(staged_skill_dir), str(installed_skill_dir))
-except Exception:
-    shutil.move(str(backup_dir), str(installed_skill_dir))
-    raise
-```
+Do not run the explicitly excluded release-ZIP relocation test under Chinese/space paths.
