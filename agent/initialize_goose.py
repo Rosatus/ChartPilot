@@ -11,8 +11,8 @@ from typing import Any, Mapping, Sequence
 import yaml
 
 
-SKILL_NAMES = (
-    "chartpilot-run-python",
+SKILL_NAMES = ("chartpilot-run-python",)
+REMOVED_SKILL_NAMES = (
     "chartpilot-profile-csv",
     "chartpilot-analyze-data",
     "chartpilot-render-chart",
@@ -171,6 +171,8 @@ def initialize(
         if not (source / "SKILL.md").is_file():
             raise FileNotFoundError(f"Required ChartPilot Skill not found: {source}")
         sync_skill(source, skills_root / name)
+    for name in REMOVED_SKILL_NAMES:
+        shutil.rmtree(skills_root / name, ignore_errors=True)
 
     return {
         "ok": True,

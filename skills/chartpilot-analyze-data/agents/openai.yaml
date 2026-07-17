@@ -1,4 +1,0 @@
-interface:
-  display_name: "ChartPilot Data Analysis"
-  short_description: "Execute auditable CSV analysis from validated plans"
-  default_prompt: "Use $chartpilot-analyze-data to execute this validated CSV analysis plan and produce evidence-backed results."

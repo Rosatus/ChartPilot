@@ -1,4 +1,4 @@
 interface:
-  display_name: "ChartPilot Python Runtime"
-  short_description: "Author and run audited Python with the bundled runtime"
-  default_prompt: "Use $chartpilot-run-python to author and execute Python with ChartPilot's bundled runtime."
+  display_name: "ChartPilot Adaptive CSV"
+  short_description: "Adapt Python templates into a task-specific CSV report"
+  default_prompt: "Use $chartpilot-run-python to inspect this CSV, write task-specific analysis and rendering code, run it with bundled WinPython, and return the validated chart and findings."

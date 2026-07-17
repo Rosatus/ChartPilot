@@ -28,6 +28,11 @@ class InitializeGooseTests(unittest.TestCase):
             MODULE.initialize(PROJECT_ROOT, goose_home, template, [PROJECT_ROOT])
             config_path = goose_home / "config/config.yaml"
             config = yaml.safe_load(config_path.read_text(encoding="utf-8"))
+            skills_root = goose_home / "config/skills"
+            for removed_name in MODULE.REMOVED_SKILL_NAMES:
+                stale = skills_root / removed_name
+                stale.mkdir(parents=True)
+                (stale / "SKILL.md").write_text("stale", encoding="utf-8")
             config["active_provider"] = "test-provider"
             config["providers"] = {"test-provider": {"enabled": True, "model": "test"}}
             config["extensions"]["chartpilot"]["enabled"] = False
@@ -44,11 +49,15 @@ class InitializeGooseTests(unittest.TestCase):
             self.assertFalse(updated["extensions"]["chartpilot"]["enabled"])
             self.assertEqual(updated["extensions"]["chartpilot"]["type"], "stdio")
             self.assertEqual(
+                updated["extensions"]["chartpilot"]["available_tools"],
+                ["chartpilot_prepare_adaptive_task", "chartpilot_run_task_python"],
+            )
+            self.assertEqual(
                 Path(updated["extensions"]["chartpilot"]["cmd"]).resolve(),
                 PROJECT_ROOT / "runtime/winpython/python/python.exe",
             )
             skill_names = sorted(
-                path.name for path in (goose_home / "config/skills").iterdir() if path.is_dir()
+                path.name for path in skills_root.iterdir() if path.is_dir()
             )
             self.assertEqual(skill_names, sorted(MODULE.SKILL_NAMES))
         finally:

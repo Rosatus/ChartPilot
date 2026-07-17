@@ -58,23 +58,24 @@ Invoke-CheckedCommand -FilePath $python -Label "Import runtime dependencies" -Ar
 )
 $checks.Add("imports")
 
-$cliScripts = @(
-    "skills\chartpilot-profile-csv\scripts\profile_csv.py",
-    "skills\chartpilot-analyze-data\scripts\run_analysis.py",
-    "skills\chartpilot-render-chart\scripts\render_chart.py"
+$templateScripts = @(
+    "skills\chartpilot-run-python\assets\templates\inspect_csv.py",
+    "skills\chartpilot-run-python\assets\templates\analyze_csv.py",
+    "skills\chartpilot-run-python\assets\templates\render_chart.py"
 )
-foreach ($relativeScript in $cliScripts) {
+foreach ($relativeScript in $templateScripts) {
     $scriptPath = Join-Path $ProjectRoot $relativeScript
-    Invoke-CheckedCommand -FilePath $python -Label "CLI help: $relativeScript" -Arguments @(
+    Invoke-CheckedCommand -FilePath $python -Label "Template help: $relativeScript" -Arguments @(
         "-I", $scriptPath, "--help"
     )
 }
-$checks.Add("cli-help")
+$checks.Add("template-help")
 
 if (-not $SkipUnitTests) {
-    Invoke-CheckedCommand -FilePath $python -Label "Analysis regression tests" -Arguments @(
+    Invoke-CheckedCommand -FilePath $python -Label "Adaptive Agent unit tests" -Arguments @(
         "-I", "-m", "unittest", "discover",
-        "-s", (Join-Path $ProjectRoot "skills\chartpilot-analyze-data\tests"),
+        "-s", (Join-Path $ProjectRoot "agent\tests"),
+        "-p", "test_*.py",
         "-v"
     )
     $checks.Add("unit-tests")
@@ -87,7 +88,7 @@ if (-not $SkipSmokeTest) {
         "--project-root", $ProjectRoot,
         "--workspace-root", $workspaceRoot
     )
-    $checks.Add("csv-to-png-smoke")
+    $checks.Add("adaptive-csv-to-png-smoke")
 }
 
 if (-not $NoManifestUpdate) {

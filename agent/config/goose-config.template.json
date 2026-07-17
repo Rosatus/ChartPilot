@@ -18,7 +18,7 @@
       "type": "stdio",
       "name": "chartpilot",
       "display_name": "ChartPilot",
-      "description": "Deterministic local CSV profiling, analysis, and chart rendering.",
+      "description": "Adaptive prompt-plus-CSV analysis with task-specific Python and charts.",
       "cmd": "${CHARTPILOT_PYTHON}",
       "args": [
         "-I",
@@ -34,9 +34,8 @@
       "timeout": 300,
       "bundled": true,
       "available_tools": [
-        "chartpilot_profile_csv",
-        "chartpilot_analyze_data",
-        "chartpilot_render_chart"
+        "chartpilot_prepare_adaptive_task",
+        "chartpilot_run_task_python"
       ]
     }
   }

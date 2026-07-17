@@ -94,13 +94,13 @@ try {
             "ChartPilot/Start-ChartPilot.cmd",
             "ChartPilot/agent/mcp/chartpilot_mcp.py",
             "ChartPilot/skills/chartpilot-run-python/SKILL.md",
-            "ChartPilot/skills/chartpilot-profile-csv/SKILL.md",
-            "ChartPilot/skills/chartpilot-analyze-data/SKILL.md",
-            "ChartPilot/skills/chartpilot-render-chart/SKILL.md",
+            "ChartPilot/skills/chartpilot-run-python/assets/templates/inspect_csv.py",
+            "ChartPilot/skills/chartpilot-run-python/assets/templates/analyze_csv.py",
+            "ChartPilot/skills/chartpilot-run-python/assets/templates/render_chart.py",
             "ChartPilot/.agents/skills/chartpilot-run-python/SKILL.md",
-            "ChartPilot/.agents/skills/chartpilot-profile-csv/SKILL.md",
-            "ChartPilot/.agents/skills/chartpilot-analyze-data/SKILL.md",
-            "ChartPilot/.agents/skills/chartpilot-render-chart/SKILL.md",
+            "ChartPilot/.agents/skills/chartpilot-run-python/assets/templates/inspect_csv.py",
+            "ChartPilot/.agents/skills/chartpilot-run-python/assets/templates/analyze_csv.py",
+            "ChartPilot/.agents/skills/chartpilot-run-python/assets/templates/render_chart.py",
             "ChartPilot/scripts/agent/start-chartpilot.ps1",
             "ChartPilot/scripts/agent/test-agent.ps1",
             "ChartPilot/scripts/runtime/test-runtime.ps1",
@@ -132,6 +132,14 @@ try {
         )
         if ($forbiddenEntries.Count -gt 0) {
             throw "Release ZIP contains forbidden project data: $($forbiddenEntries -join ', ')"
+        }
+        $removedEntries = @(
+            $entries | Where-Object {
+                $_ -match "chartpilot-(profile-csv|analyze-data|render-chart)"
+            }
+        )
+        if ($removedEntries.Count -gt 0) {
+            throw "Release ZIP contains removed deterministic routes: $($removedEntries -join ', ')"
         }
     }
     finally {

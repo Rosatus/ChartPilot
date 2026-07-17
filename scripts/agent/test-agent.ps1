@@ -47,14 +47,18 @@ try {
 finally {
     Pop-Location
 }
-foreach ($skillName in @(
-    "chartpilot-run-python",
+foreach ($skillName in @("chartpilot-run-python")) {
+    if ($skillList -notmatch [regex]::Escape($skillName)) {
+        throw "Goose did not discover required Skill: $skillName"
+    }
+}
+foreach ($removedSkill in @(
     "chartpilot-profile-csv",
     "chartpilot-analyze-data",
     "chartpilot-render-chart"
 )) {
-    if ($skillList -notmatch [regex]::Escape($skillName)) {
-        throw "Goose did not discover required Skill: $skillName"
+    if ($skillList -match [regex]::Escape($removedSkill)) {
+        throw "Goose discovered removed Skill: $removedSkill"
     }
 }
 if ($skillList -match "trellis-") {
