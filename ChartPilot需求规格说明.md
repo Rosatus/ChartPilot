@@ -163,7 +163,8 @@ Agent 修改 render 模板并生成图表和摘要
 ## 7. Skill 边界
 
 产品只提供 `chartpilot-run-python` 一个自适应 Skill，避免多个相似 Skill 导致错误路由。
-Skill 管理 prompt+CSV 准备、三份可编辑模板、阶段顺序、产物契约和视觉迭代规则。
+Skill 管理 prompt+CSV 准备、三份可编辑模板、阶段顺序、产物契约和视觉迭代规则；明细输出
+粒度与图表粒度分别决策，最终 PNG 必须由 Agent 实际读取后再完成任务。
 
 Goose 底座负责对话和模型 Provider；ChartPilot MCP 只暴露任务准备与任务 Python 执行两个
 工具，负责运行时定位、环境清理、staging、超时、执行记录和产物验证。字段语义、业务计算、
@@ -215,6 +216,7 @@ workspace/
       inspection.json
       generated_analysis.py
       result.csv
+      <optional-declared-analysis-artifacts>
       analysis_result.json
       generated_chart.py
       chart.png

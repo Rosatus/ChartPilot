@@ -3,7 +3,8 @@
 ## Python Product Boundaries
 
 Use stable, machine-readable errors at MCP and command boundaries.
-`agent/mcp/chartpilot_mcp.py` defines `ChartPilotBridgeError(code, message, details)` and serializes:
+`agent/mcp/chartpilot_mcp.py` defines
+`ChartPilotBridgeError(code, message, details, *, recoverable=False)` and serializes:
 
 ```json
 {
@@ -23,9 +24,13 @@ Follow these rules:
 - Use a stable uppercase code for caller decisions and a concise message for humans.
 - Put bounded, non-secret diagnostics in `details`; do not expose credentials or a full inherited
   environment.
+- After generated code starts, return a bounded `details.process` projection with stdout/stderr
+  tails and preserve `recoverable=true` when rethrowing after the execution record is written.
 - Catch narrow expected exceptions and chain the cause with `raise ... from exc`.
 - Validate paths, schema versions, sizes, identities, and prerequisites before side effects.
 - Preserve the exact error code when rethrowing after an execution record is written.
+- Treat `RENDER_TEXT_UNREADABLE` and generated stage-output corrections as recoverable; source,
+  request, read-root, and runtime configuration errors remain non-recoverable.
 - Convert unexpected stage failures to `ADAPTIVE_STAGE_FAILED` while recording the exception type.
 
 For standalone Python CLIs such as `agent/initialize_goose.py` and
@@ -63,7 +68,8 @@ named `.partial` file and pass expected byte/SHA-256 checks before the final mov
 Add a regression for every new failure code or rollback path. Trusted examples include:
 
 - `agent/tests/test_adaptive_bridge.py`: invalid request combinations, source mutation, and failed
-  generated Python with a persisted execution record.
+  generated Python with a persisted execution record and returned diagnostic tail, declared
+  artifact collisions/commit cleanup, missing glyphs, and replacement characters.
 - `agent/tests/test_initialize_goose.py`: idempotent config merging and stale Skill cleanup.
 - `scripts/agent/test-build-contracts.ps1`: archive/build input safety.
 - `scripts/runtime/test-runtime.ps1`: manifest, interpreter, dependency, template, and smoke gates.

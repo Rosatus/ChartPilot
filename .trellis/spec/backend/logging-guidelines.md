@@ -9,6 +9,8 @@ ChartPilot does not use a long-running application logging framework. Output is 
 - PowerShell build/test progress: concise labeled human-readable lines through `Write-Host`.
 - Recoverable build fallback: `Write-Warning`, followed by another verified strategy.
 - Generated task execution: bounded stdout/stderr stored in append-only execution records.
+- Generated stage responses: a bounded process projection for immediate Agent correction without
+  requiring shell access to execution records.
 
 Examples are `scripts/runtime/write-runtime-metadata.py:main`,
 `agent/initialize_goose.py:main`, `scripts/runtime/common.ps1:Invoke-CheckedCommand`, and
@@ -24,6 +26,8 @@ Examples are `scripts/runtime/write-runtime-metadata.py:main`,
 - Use UTC ISO-8601 timestamps for persisted records.
 - Bound generated process stdout and stderr. `chartpilot_mcp.py` currently caps each stream at
   `MAX_PROCESS_OUTPUT_BYTES` and fails attempts that exceed the limit.
+- Return only the last `MAX_PROCESS_DIAGNOSTIC_CHARS` of each stream to the Agent, with explicit
+  truncation flags; retain the existing bounded full streams in the append-only record.
 - Record script/runtime hashes, duration, exit status, and artifact hashes instead of copying large
   data into logs.
 

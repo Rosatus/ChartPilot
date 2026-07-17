@@ -100,7 +100,11 @@ Goose 通过 Summon 只加载 `chartpilot-run-python`，通过 stdio 启动
 ```
 
 stage 顺序为 inspect、analysis、render。MCP 使用临时输出目录，只有当阶段契约验证通过时
-才事务式替换任务产物，`analysis_result.json` 或 `chart_result.json` 最后安装。
+才事务式替换任务产物，`analysis_result.json` 或 `chart_result.json` 最后安装。Analysis 可
+声明并提交额外 UTF-8 辅助文件；重试时不再声明的旧阶段文件会在同一事务中移除。
+
+生成进程失败时，工具响应直接包含有界 stdout/stderr 尾部诊断。Render 出现 Matplotlib
+中文缺字警告或文本替换字符时按可恢复错误处理，不会把仅“非空”的乱码 PNG 提交为成功。
 
 ## 子进程环境
 

@@ -90,12 +90,14 @@ templates, modifies each stage when useful, then calls `chartpilot_run_task_pyth
 ```text
 request.md + task_context.json + generated_inspect.py
   -> inspection.json
-  -> generated_analysis.py + result.csv + analysis_result.json
+  -> generated_analysis.py + result.csv + optional declared supporting files + analysis_result.json
   -> generated_chart.py + chart.png + chart_result.json + summary.md
 ```
 
 The Agent should iterate on generated code when calculations, labels, chart composition, or
-presentation do not satisfy the request. There is no deterministic alternate route.
+presentation do not satisfy the request. Execution responses include bounded process diagnostics;
+missing font glyphs fail render. The Agent visually inspects the actual PNG before reporting only
+committed artifacts. There is no deterministic alternate route.
 
 ## Validate and package
 

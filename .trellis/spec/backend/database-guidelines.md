@@ -24,6 +24,9 @@ Representative code is in `agent/mcp/chartpilot_mcp.py` (`load_json`, `write_jso
   PowerShell partial-file move.
 - Keep task attempts append-only under `executions/`; replace successful stage outputs only after
   staging validation succeeds.
+- Commit only standard or explicitly declared auxiliary stage artifacts. Record auxiliary
+  path/size/hash in the completion manifest and remove no-longer-declared prior stage files in the
+  same backup/restore transaction.
 - Keep generated data in ignored output roots. Checked-in fixtures must be small, anonymous, and
   deterministic.
 

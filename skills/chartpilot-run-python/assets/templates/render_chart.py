@@ -20,14 +20,25 @@ def load_context(path: Path) -> dict[str, Any]:
     return value
 
 
-def choose_font() -> font_manager.FontProperties:
+def configure_fonts() -> font_manager.FontProperties:
+    """Configure one discovered font globally so every Matplotlib text element inherits it."""
     candidates = [
         Path("C:/Windows/Fonts/msyh.ttc"),
+        Path("C:/Windows/Fonts/msyhbd.ttc"),
         Path("C:/Windows/Fonts/simhei.ttf"),
         Path("C:/Windows/Fonts/arial.ttf"),
     ]
     path = next((item for item in candidates if item.is_file()), None)
-    return font_manager.FontProperties(fname=str(path)) if path else font_manager.FontProperties()
+    if path:
+        font_manager.fontManager.addfont(str(path))
+        font = font_manager.FontProperties(fname=str(path))
+        family = font.get_name()
+        plt.rcParams["font.family"] = [family]
+        plt.rcParams["font.sans-serif"] = [family]
+    else:
+        font = font_manager.FontProperties()
+    plt.rcParams["axes.unicode_minus"] = False
+    return font
 
 
 def render(
@@ -36,7 +47,7 @@ def render(
     output_dir: Path,
     font: font_manager.FontProperties,
 ) -> dict[str, Any]:
-    """EDIT THIS FUNCTION to build the report that best explains the findings."""
+    """EDIT: build the report; keep global font setup and choose a readable visual grain."""
     numeric = [name for name in frame.columns if pd.api.types.is_numeric_dtype(frame[name])]
     if not numeric:
         raise ValueError("The starter renderer needs at least one numeric result column.")
@@ -65,11 +76,12 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--context", required=True)
     args = parser.parse_args(argv)
     context = load_context(Path(args.context))
+    # output_dir is write-only. Always read upstream data from the named context paths below.
     output_dir = Path(context["paths"]["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     analysis = json.loads(Path(context["paths"]["analysis_result"]).read_text(encoding="utf-8"))
     frame = pd.read_csv(context["paths"]["result_csv"], encoding="utf-8-sig")
-    metadata = render(frame, analysis, output_dir, choose_font())
+    metadata = render(frame, analysis, output_dir, configure_fonts())
     findings = analysis.get("findings", [])
     summary = "\n\n".join(str(item.get("text", "")) for item in findings if item.get("text"))
     (output_dir / "summary.md").write_text(summary + "\n", encoding="utf-8", newline="\n")

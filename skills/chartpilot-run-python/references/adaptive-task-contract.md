@@ -52,8 +52,10 @@ The context uses schema `chartpilot.adaptive-task/v1` and provides:
 - task/input/output artifact paths;
 - current stage, attempt, and submitted script hash.
 
-Always read paths from the context. The stage output directory is an attempt-specific staging
-directory and changes between retries.
+Always read paths from the context. `context.paths.output_dir` is an attempt-specific write
+directory and changes between retries; never read upstream artifacts from it. Read upstream data
+from `context.source.path`, `context.paths.prepared_csv`, `context.paths.result_csv`, or
+`context.paths.analysis_result` as appropriate.
 
 ## 3. Inspect Output
 
@@ -104,6 +106,18 @@ Write nonempty UTF-8/UTF-8-SIG `result.csv` and `adaptive_analysis.json`:
 every finding must include an evidence list. The bridge creates `analysis_result.json` after
 validation.
 
+Optional supporting files are declared in `adaptive_analysis.json`:
+
+```json
+{
+  "artifacts": ["category_baseline.csv", "exceptions.csv"]
+}
+```
+
+Entries are unique plain filenames with `.csv`, `.json`, `.md`, or `.txt` extensions. Declared
+files must be nonempty UTF-8 text. The bridge commits them atomically and records their size/hash
+under `analysis_result.json.artifacts.auxiliary`; unlisted attempt files are discarded.
+
 ## 5. Render Output
 
 Write a valid nonblank `chart.png`, nonempty UTF-8 `summary.md`, and `adaptive_chart.json`:
@@ -119,7 +133,10 @@ Write a valid nonblank `chart.png`, nonempty UTF-8 `summary.md`, and `adaptive_c
 ```
 
 The PNG must be between 320x240 and 8192x8192 and no larger than 64 MiB. The bridge verifies that
-it is nonblank and creates `chart_result.json` after validation.
+it is nonblank and creates `chart_result.json` after validation. Matplotlib missing-glyph warnings
+cause recoverable `RENDER_TEXT_UNREADABLE`; replacement characters in render text are rejected.
+After success, the Agent must still inspect the actual image because nonblank validation does not
+judge layout, density, overlap, or whether the visual answers the request.
 
 ## 6. Execution And Retry Rules
 
@@ -127,6 +144,8 @@ it is nonblank and creates `chart_result.json` after validation.
   `generated_analysis.py`, and `generated_chart.py`.
 - Outputs run in staging and replace prior successful stage outputs only after validation.
 - Execution records are append-only under `executions/` and include bounded stdout/stderr.
+- Tool responses include bounded process diagnostics. Failures after generated code starts are
+  marked recoverable and include stderr/stdout tails for source correction.
 - Analysis requires a successful inspect output. Render requires a successful analysis output.
 - The source CSV hash is checked before every stage. Prepare a new task if it changed.
 - On failure, change the source before retrying; do not repeat an identical attempt.

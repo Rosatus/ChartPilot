@@ -42,9 +42,29 @@ MAX_JSON_BYTES = 5 * 1024 * 1024
 MAX_REQUEST_BYTES = 128 * 1024
 MAX_SOURCE_CODE_BYTES = 512 * 1024
 MAX_PROCESS_OUTPUT_BYTES = 1024 * 1024
+MAX_PROCESS_DIAGNOSTIC_CHARS = 4096
 MAX_PNG_BYTES = 64 * 1024 * 1024
+MAX_AUXILIARY_ARTIFACT_BYTES = 64 * 1024 * 1024
+MAX_AUXILIARY_ARTIFACTS = 32
 PROCESS_TIMEOUT_SECONDS = 300
 PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+AUXILIARY_ARTIFACT_EXTENSIONS = {".csv", ".json", ".md", ".txt"}
+STANDARD_ANALYSIS_ARTIFACTS = {"result.csv", "adaptive_analysis.json"}
+RESERVED_TASK_ARTIFACTS = {
+    *STANDARD_ANALYSIS_ARTIFACTS,
+    "analysis_result.json",
+    "chart.png",
+    "chart_result.json",
+    "inspection.json",
+    "prepared.csv",
+    "request.md",
+    "summary.md",
+    "task_context.json",
+    "adaptive_chart.json",
+    *SCRIPT_NAMES.values(),
+}
+RESERVED_TASK_ARTIFACT_KEYS = {name.casefold() for name in RESERVED_TASK_ARTIFACTS}
+MISSING_GLYPH_PATTERN = re.compile(r"Glyph\s+(\d+).*missing from font", re.IGNORECASE)
 SENSITIVE_ENV_PATTERN = re.compile(
     r"(?:API[_-]?KEY|TOKEN|SECRET|PASSWORD|CREDENTIAL)", re.IGNORECASE
 )
@@ -65,16 +85,24 @@ mcp = FastMCP(SERVER_NAME)
 
 
 class ChartPilotBridgeError(RuntimeError):
-    def __init__(self, code: str, message: str, details: Mapping[str, Any] | None = None) -> None:
+    def __init__(
+        self,
+        code: str,
+        message: str,
+        details: Mapping[str, Any] | None = None,
+        *,
+        recoverable: bool = False,
+    ) -> None:
         self.code = code
         self.details = dict(details or {})
+        self.recoverable = recoverable
         self.payload = {
             "status": "error",
             "stage": "agent",
             "error": {
                 "code": code,
                 "message": message,
-                "recoverable": False,
+                "recoverable": recoverable,
                 "details": self.details,
             },
         }
@@ -499,6 +527,33 @@ def run_python_process(
     }
 
 
+def process_diagnostics(process_result: Mapping[str, Any]) -> dict[str, Any]:
+    stdout = str(process_result.get("stdout", ""))
+    stderr = str(process_result.get("stderr", ""))
+    return {
+        "exit_code": process_result.get("exit_code"),
+        "duration_ms": process_result.get("duration_ms"),
+        "timed_out": bool(process_result.get("timed_out")),
+        "output_too_large": bool(process_result.get("output_too_large")),
+        "stdout_tail": stdout[-MAX_PROCESS_DIAGNOSTIC_CHARS:],
+        "stderr_tail": stderr[-MAX_PROCESS_DIAGNOSTIC_CHARS:],
+        "stdout_truncated": (
+            bool(process_result.get("output_too_large"))
+            or len(stdout) > MAX_PROCESS_DIAGNOSTIC_CHARS
+        ),
+        "stderr_truncated": (
+            bool(process_result.get("output_too_large"))
+            or len(stderr) > MAX_PROCESS_DIAGNOSTIC_CHARS
+        ),
+    }
+
+
+def missing_glyph_codepoints(process_result: Mapping[str, Any]) -> list[str]:
+    stderr = str(process_result.get("stderr", ""))
+    values = {int(match) for match in MISSING_GLYPH_PATTERN.findall(stderr)}
+    return [f"U+{value:04X}" for value in sorted(values)]
+
+
 def validate_identity(payload: Mapping[str, Any], schema: str, task_id: str, name: str) -> None:
     if payload.get("schema_version") != schema or payload.get("task_id") != task_id:
         raise ChartPilotBridgeError(
@@ -548,6 +603,69 @@ def validate_result_csv(path: Path, result_schema: Any) -> list[str]:
     return headers
 
 
+def validate_analysis_artifacts(staging: Path, declared: Any) -> list[str]:
+    if declared is None:
+        return []
+    if not isinstance(declared, list) or len(declared) > MAX_AUXILIARY_ARTIFACTS:
+        raise ChartPilotBridgeError(
+            "INVALID_STAGE_OUTPUT",
+            f"artifacts must be a list with at most {MAX_AUXILIARY_ARTIFACTS} filenames.",
+        )
+    names: list[str] = []
+    seen: set[str] = set()
+    for value in declared:
+        name = require_text(value, "artifacts[]", 240)
+        name_key = name.casefold()
+        if name_key in seen:
+            raise ChartPilotBridgeError(
+                "INVALID_STAGE_OUTPUT", "artifacts filenames must be unique."
+            )
+        seen.add(name_key)
+        if name in STANDARD_ANALYSIS_ARTIFACTS:
+            continue
+        candidate = Path(name)
+        if (
+            candidate.is_absolute()
+            or candidate.name != name
+            or "/" in name
+            or "\\" in name
+            or name_key in RESERVED_TASK_ARTIFACT_KEYS
+            or candidate.suffix.lower() not in AUXILIARY_ARTIFACT_EXTENSIONS
+        ):
+            raise ChartPilotBridgeError(
+                "INVALID_STAGE_OUTPUT",
+                "artifacts entries must be plain task-local CSV, JSON, Markdown, or text filenames.",
+                {"name": name},
+            )
+        path = staging / name
+        if (
+            not path.is_file()
+            or path.stat().st_size == 0
+            or path.stat().st_size > MAX_AUXILIARY_ARTIFACT_BYTES
+        ):
+            raise ChartPilotBridgeError(
+                "INVALID_STAGE_OUTPUT",
+                "A declared analysis artifact is missing, empty, or too large.",
+                {"name": name, "max_bytes": MAX_AUXILIARY_ARTIFACT_BYTES},
+            )
+        try:
+            text = path.read_text(encoding="utf-8-sig")
+        except (OSError, UnicodeError) as exc:
+            raise ChartPilotBridgeError(
+                "INVALID_STAGE_OUTPUT",
+                "Declared analysis artifacts must be UTF-8 text.",
+                {"name": name},
+            ) from exc
+        if "\ufffd" in text:
+            raise ChartPilotBridgeError(
+                "INVALID_STAGE_OUTPUT",
+                "A declared analysis artifact contains replacement characters.",
+                {"name": name},
+            )
+        names.append(name)
+    return names
+
+
 def validate_analysis(
     staging: Path, task_context: Mapping[str, Any], script_name: str, script_hash: str
 ) -> tuple[dict[str, Any], list[str]]:
@@ -577,6 +695,7 @@ def validate_analysis(
             raise ChartPilotBridgeError("INVALID_STAGE_OUTPUT", "finding.evidence must be a list.")
     result_path = staging / "result.csv"
     validate_result_csv(result_path, payload.get("result_schema"))
+    auxiliary_names = validate_analysis_artifacts(staging, payload.get("artifacts"))
     adaptive_path = staging / "adaptive_analysis.json"
     request = task_context["request"]
     source = task_context["source"]
@@ -600,11 +719,27 @@ def validate_analysis(
                 "path": "adaptive_analysis.json",
                 "sha256": sha256_file(adaptive_path),
             },
+            "auxiliary": [
+                {
+                    "path": name,
+                    "bytes": (staging / name).stat().st_size,
+                    "sha256": sha256_file(staging / name),
+                }
+                for name in auxiliary_names
+            ],
         },
-        "validation": {"passed": True, "checks": ["task_identity", "result_csv_contract"]},
+        "validation": {
+            "passed": True,
+            "checks": ["task_identity", "result_csv_contract", "declared_artifacts"],
+        },
     }
     write_json_atomic(staging / "analysis_result.json", manifest)
-    return manifest, ["result.csv", "adaptive_analysis.json", "analysis_result.json"]
+    return manifest, [
+        "result.csv",
+        "adaptive_analysis.json",
+        *auxiliary_names,
+        "analysis_result.json",
+    ]
 
 
 def validate_png(path: Path) -> dict[str, Any]:
@@ -655,6 +790,10 @@ def validate_render(
         raise ChartPilotBridgeError("INVALID_STAGE_OUTPUT", "summary.md must be UTF-8.") from exc
     if not summary.strip():
         raise ChartPilotBridgeError("INVALID_STAGE_OUTPUT", "summary.md must not be empty.")
+    if "\ufffd" in summary or "\ufffd" in json.dumps(payload, ensure_ascii=False):
+        raise ChartPilotBridgeError(
+            "INVALID_STAGE_OUTPUT", "Render text artifacts contain replacement characters."
+        )
     png_path = staging / "chart.png"
     png = validate_png(png_path)
     adaptive_path = staging / "adaptive_chart.json"
@@ -693,12 +832,26 @@ def validate_render(
     return manifest, ["chart.png", "summary.md", "adaptive_chart.json", "chart_result.json"]
 
 
-def commit_outputs(staging: Path, task_dir: Path, names: Sequence[str]) -> None:
+def commit_outputs(
+    staging: Path,
+    task_dir: Path,
+    names: Sequence[str],
+    previous_names: Sequence[str] = (),
+) -> None:
     backup = staging / ".backup"
     backup.mkdir()
     installed: list[Path] = []
     backed_up: list[tuple[Path, Path]] = []
     try:
+        current = set(names)
+        for name in previous_names:
+            if name in current or Path(name).name != name:
+                continue
+            destination = task_dir / name
+            if destination.is_file():
+                backup_path = backup / name
+                os.replace(destination, backup_path)
+                backed_up.append((backup_path, destination))
         for name in names:
             source = staging / name
             if not source.is_file():
@@ -766,22 +919,37 @@ def run_task_python(task_id: str, stage: str, source_code: str) -> dict[str, Any
         attempt_context_path = staging / "task_context.json"
         write_json_atomic(attempt_context_path, attempt_context)
         process_result = run_python_process(context, task_dir, script_path, attempt_context_path)
+        diagnostics = process_diagnostics(process_result)
         if process_result["timed_out"]:
             raise ChartPilotBridgeError(
                 "PROCESS_TIMEOUT",
                 "Generated task Python exceeded its execution timeout.",
-                {"timeout_seconds": PROCESS_TIMEOUT_SECONDS},
+                {"timeout_seconds": PROCESS_TIMEOUT_SECONDS, "process": diagnostics},
+                recoverable=True,
             )
         if process_result["output_too_large"]:
             raise ChartPilotBridgeError(
-                "PROCESS_OUTPUT_TOO_LARGE", "Generated task Python exceeded its output limit."
+                "PROCESS_OUTPUT_TOO_LARGE",
+                "Generated task Python exceeded its output limit.",
+                {"process": diagnostics},
+                recoverable=True,
             )
         if process_result["exit_code"] != 0:
             raise ChartPilotBridgeError(
                 "PYTHON_EXECUTION_FAILED",
                 "Generated task Python returned a nonzero exit code.",
-                {"exit_code": process_result["exit_code"]},
+                {"exit_code": process_result["exit_code"], "process": diagnostics},
+                recoverable=True,
             )
+        if stage == "render":
+            missing_codepoints = missing_glyph_codepoints(process_result)
+            if missing_codepoints:
+                raise ChartPilotBridgeError(
+                    "RENDER_TEXT_UNREADABLE",
+                    "The chart renderer reported missing font glyphs.",
+                    {"missing_codepoints": missing_codepoints, "process": diagnostics},
+                    recoverable=True,
+                )
 
         if stage == "inspect":
             payload, outputs = validate_inspection(staging, task_id)
@@ -792,12 +960,23 @@ def run_task_python(task_id: str, stage: str, source_code: str) -> dict[str, Any
         else:
             payload, outputs = validate_render(staging, task_context, script_name, script_hash)
             response = {"chart": payload}
-        commit_outputs(staging, task_dir, outputs)
+        previous_names = [
+            str(item.get("path"))
+            for item in task_context["artifacts"].get(stage, [])
+            if isinstance(item, Mapping) and item.get("path")
+        ]
+        commit_outputs(staging, task_dir, outputs, previous_names)
         task_context["artifacts"][stage] = artifact_snapshot(task_dir, outputs)
         write_json_atomic(task_dir / "task_context.json", task_context)
         status = "success"
+        response["process"] = diagnostics
     except ChartPilotBridgeError as exc:
-        error_payload = exc.payload
+        error_payload = deepcopy(exc.payload)
+        if process_result is not None:
+            error_payload["error"]["recoverable"] = True
+            error_payload["error"]["details"].setdefault(
+                "process", process_diagnostics(process_result)
+            )
     except Exception as exc:
         error_payload = ChartPilotBridgeError(
             "ADAPTIVE_STAGE_FAILED",
@@ -829,6 +1008,7 @@ def run_task_python(task_id: str, stage: str, source_code: str) -> dict[str, Any
             str(error["code"]),
             str(error["message"]),
             {**dict(error.get("details", {})), "execution_record": str(record_path)},
+            recoverable=bool(error.get("recoverable")),
         )
     return {
         "task_id": task_id,

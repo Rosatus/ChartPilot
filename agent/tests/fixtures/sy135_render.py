@@ -20,8 +20,16 @@ COLORS = ["#7FC4E2", "#CDE52B", "#FFBC12", "#FF6232", "#9C2AB7"]
 def font() -> font_manager.FontProperties:
     for path in (Path("C:/Windows/Fonts/msyh.ttc"), Path("C:/Windows/Fonts/simhei.ttf")):
         if path.is_file():
-            return font_manager.FontProperties(fname=str(path))
-    return font_manager.FontProperties()
+            font_manager.fontManager.addfont(str(path))
+            selected = font_manager.FontProperties(fname=str(path))
+            family = selected.get_name()
+            plt.rcParams["font.family"] = [family]
+            plt.rcParams["font.sans-serif"] = [family]
+            plt.rcParams["axes.unicode_minus"] = False
+            return selected
+    selected = font_manager.FontProperties()
+    plt.rcParams["axes.unicode_minus"] = False
+    return selected
 
 
 def apply_font(axis: plt.Axes, selected: font_manager.FontProperties) -> None:

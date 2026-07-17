@@ -66,7 +66,8 @@ ChartPilot stdio MCP 必须且只能暴露：
 - 不包含特定机型、字段、阈值或图表布局；
 - 只使用运行时清单中的依赖；
 - 使用 UTF-8，模块可安全导入，入口返回退出码；
-- 把产物写到 `context.paths.output_dir`，不能假设重试时 staging 路径不变。
+- 只把产物写到 `context.paths.output_dir`，不能从该尝试级 staging 目录读取上游文件；
+  上游输入必须使用 `context.source.path` 或明确的 `context.paths.*` 路径。
 
 Agent 不应机械保留模板逻辑。遇到嵌套分组、主类别选择、同群基准、复杂派生指标、多区域
 图表或高密度标注时，应重写对应函数，使代码忠实反映 prompt 和数据。
@@ -88,6 +89,10 @@ Agent 不应机械保留模板逻辑。遇到嵌套分组、主类别选择、�
 后者包含问题、假设、与 CSV 表头一致的 result schema、带 evidence 的 findings 和 chart
 intent。MCP 验证后生成 `analysis_result.json`；所有业务计算由生成代码负责。
 
+任务需要档位基线、异常清单或说明文件时，可在 `adaptive_analysis.json.artifacts` 中声明
+纯文件名的 UTF-8 CSV/JSON/Markdown/text 辅助产物。只有声明且验证通过的文件会与标准产物
+一起提交、哈希并写入 manifest；未声明的 staging 文件会丢弃。
+
 ### Render
 
 必需：
@@ -96,8 +101,9 @@ intent。MCP 验证后生成 `analysis_result.json`；所有业务计算由生�
 - `summary.md`
 - `adaptive_chart.json`
 
-Agent 可以自由使用单图或多区域布局。MCP 检查 PNG 签名、尺寸、文件大小和前景像素，再
-生成 `chart_result.json`。
+Agent 可以自由使用单图或多区域布局。MCP 检查 PNG 签名、尺寸、文件大小和前景像素；
+Matplotlib 缺字警告和文本替换字符会使阶段失败。生成 `chart_result.json` 后，Agent 仍须
+实际读取图片，检查过绘制、标题/图例/标注碰撞、裁切和业务表达，必要时修改 render 重试。
 
 ## 执行记录与失败
 
@@ -108,11 +114,13 @@ Agent 可以自由使用单图或多区域布局。MCP 检查 PNG 签名、尺�
 - runtime ID 与 manifest SHA-256；
 - 开始/结束时间、耗时、退出码；
 - 受限 stdout/stderr；
+- 返回给 Agent 的有界 stdout/stderr 尾部诊断；
 - 已提交产物及哈希；
 - 失败错误对象。
 
 阶段输出先写 staging，验证通过后才替换任务目录中的上一版，completion manifest 最后
-安装。源 CSV 在每个阶段前重新校验 SHA-256。失败后必须修改代码再重试。
+安装。源 CSV 在每个阶段前重新校验 SHA-256。生成代码开始执行后的错误标记为可恢复，并在
+工具响应中直接提供诊断；失败后必须修改代码再重试。
 
 ## 自由度与边界
 

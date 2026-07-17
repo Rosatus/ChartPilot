@@ -62,6 +62,9 @@ def execute(project_root: Path, case_root: Path, keep_output: bool) -> dict[str,
             task_id, "render", (fixtures / "sy135_render.py").read_text(encoding="utf-8")
         )
         inspection = json.loads((task_dir / "inspection.json").read_text(encoding="utf-8"))
+        analysis_manifest = json.loads(
+            (task_dir / "analysis_result.json").read_text(encoding="utf-8")
+        )
         result = pd.read_csv(task_dir / "result.csv", encoding="utf-8-sig")
         counts = result.groupby("gear").size().sort_index().tolist()
         checks = {
@@ -71,6 +74,18 @@ def execute(project_root: Path, case_root: Path, keep_output: bool) -> dict[str,
             "machines_by_gear": [int(value) for value in counts] == expected["machines_by_gear"],
             "above_25": int((result["relative_ratio"] > 1.25).sum()) == expected["above_25"],
             "above_50": int((result["relative_ratio"] > 1.50).sum()) == expected["above_50"],
+            "auxiliary_artifacts": {
+                item["path"] for item in analysis_manifest["artifacts"]["auxiliary"]
+            }
+            == {"gear_baseline.csv", "above_25_percent.csv", "above_50_percent.csv"},
+            "auxiliary_files_exist": all(
+                (task_dir / name).is_file()
+                for name in (
+                    "gear_baseline.csv",
+                    "above_25_percent.csv",
+                    "above_50_percent.csv",
+                )
+            ),
         }
         with Image.open(task_dir / "chart.png") as image:
             width, height = image.size

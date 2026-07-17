@@ -60,6 +60,20 @@ def main() -> int:
     above_50 = int((result["relative_ratio"] > 1.50).sum())
     output = Path(context["paths"]["output_dir"])
     result.to_csv(output / "result.csv", index=False, encoding="utf-8-sig", lineterminator="\n")
+    gear_baseline = result.groupby("gear", as_index=False).agg(
+        machine_count=("login_id", "size"),
+        mean_fuel=("mean_fuel", "mean"),
+        gear_baseline=("gear_baseline", "first"),
+    )
+    gear_baseline.to_csv(
+        output / "gear_baseline.csv", index=False, encoding="utf-8-sig", lineterminator="\n"
+    )
+    result[result["relative_ratio"] > 1.25].to_csv(
+        output / "above_25_percent.csv", index=False, encoding="utf-8-sig", lineterminator="\n"
+    )
+    result[result["relative_ratio"] > 1.50].to_csv(
+        output / "above_50_percent.csv", index=False, encoding="utf-8-sig", lineterminator="\n"
+    )
     payload = {
         "schema_version": "chartpilot.adaptive-analysis/v1",
         "task_id": context["task_id"],
@@ -109,7 +123,25 @@ def main() -> int:
             "report_type": "multi-panel-risk-report",
             "title": "SY135I4 主档位油耗风险分析",
             "thresholds": [1.25, 1.50, 1.75],
+            "detail_grain": "one row per machine",
+            "visual_grain": "one mark per gear and risk band",
+            "panel_purposes": [
+                "compare population composition by gear and risk band",
+                "compare aggregated fuel severity against gear thresholds",
+            ],
+            "encodings": {
+                "x": "gear",
+                "y": "mean_fuel",
+                "area": "machine_count",
+                "color": "risk",
+            },
+            "density_strategy": "aggregate machine detail by gear and risk band for rendering",
         },
+        "artifacts": [
+            "gear_baseline.csv",
+            "above_25_percent.csv",
+            "above_50_percent.csv",
+        ],
     }
     (output / "adaptive_analysis.json").write_text(
         json.dumps(payload, ensure_ascii=False, indent=2) + "\n", encoding="utf-8"

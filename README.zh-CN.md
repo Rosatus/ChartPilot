@@ -83,11 +83,12 @@ Goose 中配置模型 Provider。
 ```text
 request.md + task_context.json + generated_inspect.py
   -> inspection.json
-  -> generated_analysis.py + result.csv + analysis_result.json
+  -> generated_analysis.py + result.csv + 可选声明的辅助文件 + analysis_result.json
   -> generated_chart.py + chart.png + chart_result.json + summary.md
 ```
 
-如果计算、标签、图表组合或呈现效果不符合需求，Agent 应修改生成代码并重试。系统不存在
+执行响应包含有界进程诊断，中文缺字会使 render 失败。Agent 必须实际读取最终 PNG，若计算、
+密度、重叠、标签或图表组合不符合需求则修改代码并重试，最后只报告已提交产物。系统不存在
 确定性备用路由。
 
 ## 验证与打包

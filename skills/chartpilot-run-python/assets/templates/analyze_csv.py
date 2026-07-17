@@ -29,7 +29,7 @@ def read_source(context: dict[str, Any]) -> pd.DataFrame:
 
 
 def analyze(frame: pd.DataFrame, context: dict[str, Any]) -> tuple[pd.DataFrame, dict[str, Any]]:
-    """EDIT THIS FUNCTION to implement the user's actual analytical intent."""
+    """EDIT: implement the request and separate detail-output grain from visual grain."""
     converted: dict[str, pd.Series] = {}
     for name in frame.columns:
         numeric = pd.to_numeric(frame[name], errors="coerce")
@@ -81,7 +81,21 @@ def analyze(frame: pd.DataFrame, context: dict[str, Any]) -> tuple[pd.DataFrame,
         "assumptions": ["The unchanged starter template selected fields heuristically."],
         "result_schema": result_schema,
         "findings": [{"id": "finding-1", "text": finding_text, "evidence": evidence}],
-        "chart_intent": {"report_type": "comparison", "title": request.strip()[:160]},
+        "chart_intent": {
+            "report_type": "comparison",
+            "title": request.strip()[:160],
+            "detail_grain": "one result row per category",
+            "visual_grain": "one mark per category",
+            "panel_purposes": ["compare the selected metric across categories"],
+            "encodings": {
+                "x": "category",
+                "y": "value_mean" if "value_mean" in result.columns else "row_count",
+                "weight": "row_count",
+            },
+            "density_strategy": "show the bounded category result directly",
+        },
+        # Add plain filenames here when this stage writes supporting CSV/JSON/Markdown/text files.
+        "artifacts": [],
     }
     return result, payload
 
@@ -91,6 +105,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--context", required=True)
     args = parser.parse_args(argv)
     context = load_context(Path(args.context))
+    # output_dir is write-only for this attempt. Read inputs through context.paths/source.
     output_dir = Path(context["paths"]["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     result, payload = analyze(read_source(context), context)

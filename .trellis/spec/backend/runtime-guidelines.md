@@ -139,6 +139,25 @@ Inspect requires `inspection.json` and may emit `prepared.csv`. Analysis require
 `chart.png`, nonempty `summary.md`, and `adaptive_chart.json`; the bridge creates
 `chart_result.json`.
 
+The attempt context's `paths.output_dir` is write-only and changes on every retry. Generated code
+must read upstream inputs from `source.path`, `paths.prepared_csv`, `paths.result_csv`, or
+`paths.analysis_result`, never by joining input names beneath `output_dir`.
+
+Analysis may declare up to 32 unique, case-insensitively distinct, plain task-local filenames in
+`adaptive_analysis.json.artifacts`. Allowed extensions are `.csv`, `.json`, `.md`, and `.txt`;
+files must be nonempty UTF-8 text and at most 64 MiB. Standard analysis filenames may be listed but
+are not duplicated as auxiliary artifacts. The bridge commits validated auxiliary files before
+`analysis_result.json`, records path/size/SHA-256 under `artifacts.auxiliary`, discards undeclared
+staging files, and transactionally removes prior stage artifacts that are no longer declared.
+
+Stage tool responses include a bounded `process` object with exit code, duration, timeout/output
+flags, stdout/stderr tails, and truncation flags. Once generated code has started, execution and
+stage-output correction errors are recoverable. Render must fail with
+`RENDER_TEXT_UNREADABLE` when Matplotlib reports missing font glyphs; UTF-8 render text containing
+U+FFFD is `INVALID_STAGE_OUTPUT`. A nonblank PNG remains only a transport check: the Agent must
+read the actual image and retry opaque point clouds, text collisions, clipping, or a visual grain
+that does not answer the request.
+
 The bridge does not validate business correctness. Prompt-specific tests and Agent reasoning own
 field mapping, calculations, thresholds, findings, and visual design.
 
@@ -164,6 +183,9 @@ external. Do not describe Goose or WinPython as a sandbox.
 | Source hash differs from preparation | `SOURCE_CHANGED` before execution |
 | Analysis/render prerequisite is absent | `STAGE_PREREQUISITE_MISSING` |
 | Process times out, floods output, or exits nonzero | `PROCESS_TIMEOUT`, `PROCESS_OUTPUT_TOO_LARGE`, or `PYTHON_EXECUTION_FAILED` |
+| Declared auxiliary name collides, escapes the task root, has the wrong extension, is missing/empty/oversized, or is not UTF-8 | recoverable `INVALID_STAGE_OUTPUT`; do not commit staged outputs |
+| Render stderr reports one or more missing font glyphs | recoverable `RENDER_TEXT_UNREADABLE` with code points and bounded process diagnostics |
+| Render summary/metadata contains U+FFFD replacement text | recoverable `INVALID_STAGE_OUTPUT`; do not commit staged outputs |
 | Required stage artifact is absent, malformed, or blank | Artifact-specific error or `INVALID_STAGE_OUTPUT`; do not commit staged outputs |
 
 Every attempted process execution writes an append-only record. Commit completion manifests last,
@@ -171,23 +193,30 @@ after all outputs validate.
 
 ### 5. Good/Base/Bad Cases
 
-- Good: adapt all three templates to a new schema and request, then emit evidence-backed analysis
-  plus a task-specific multi-panel chart that passes every bridge contract.
+- Good: adapt all three templates to a new schema and request, declare supporting baseline/exception
+  files, then emit evidence-backed analysis plus a task-specific multi-panel chart whose actual
+  image is inspected and readable.
 - Base: run the unchanged compact templates on their documented minimal CSV contract and produce
   every required artifact.
-- Bad: call system `python`, install packages at task time, edit the source CSV, embed fixed
-  business fields/thresholds in the bridge, or expose a removed deterministic tool/Skill.
+- Bad: call system `python`, install packages at task time, read upstream files from `output_dir`,
+  advertise undeclared staging files, accept missing-glyph warnings, treat a nonblank PNG as visual
+  approval, embed fixed business fields/thresholds in the bridge, or expose a removed deterministic
+  tool/Skill.
 
 ### 6. Tests Required
 
 - Unit: request-form validation, read-root rejection, source-hash rejection, failed execution
-  records, stage prerequisites, and output validators.
+  records with recoverable diagnostic tails, stage prerequisites, case-insensitive auxiliary-name
+  collisions, auxiliary commit/stale removal, missing-glyph rejection, replacement-character
+  rejection, and output validators.
 - Contract: MCP `tools/list` returns exactly the two signatures above; Goose stages exactly one
   product Skill and cleans stale removed Skill directories.
 - Template: all three templates pass `--help`, run unchanged on the minimal contract, and can be
   customized for the anonymous changed-schema/threshold fixture.
 - End to end: the external SY135 case asserts 59,278 source rows, 6,523 machines, exact gear
-  totals, 96 above 25%, zero above 50%, and two populated chart regions.
+  totals, 96 above 25%, zero above 50%, committed auxiliary files, two populated chart regions,
+  and no render stderr warnings. Forward-test the product Skill with Goose and verify `read_image`
+  is called before completion when provider state permits.
 - Release: assert `pip check`, imports, locks, licenses, two Skill copies, six template copies,
   zero removed Skill entries, and zero forbidden metadata/cache entries.
 
@@ -198,6 +227,9 @@ Wrong:
 ```python
 subprocess.run(["python", script_path])
 # Or register a fixed business tool for requests judged to be simple.
+
+# output_dir is staging for this attempt, so this input will not exist.
+frame = pd.read_csv(Path(context["paths"]["output_dir"]) / "result.csv")
 ```
 
 Correct:
@@ -209,6 +241,9 @@ subprocess.Popen(
     env=context.child_environment(),
 )
 # Keep only chartpilot_prepare_adaptive_task and chartpilot_run_task_python.
+
+frame = pd.read_csv(context["paths"]["result_csv"], encoding="utf-8-sig")
+output_dir = Path(context["paths"]["output_dir"])
 ```
 
 ## Scenario: Portable Goose Base

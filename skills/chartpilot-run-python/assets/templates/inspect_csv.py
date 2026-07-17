@@ -26,7 +26,7 @@ def read_csv(context: dict[str, Any]) -> pd.DataFrame:
 
 
 def inspect(frame: pd.DataFrame, context: dict[str, Any]) -> dict[str, Any]:
-    """EDIT THIS FUNCTION to add domain-specific inspection or preparation."""
+    """EDIT: capture row/entity grain, field meaning, quality rules, and tie policy in notes."""
     columns: list[dict[str, Any]] = []
     roles: dict[str, list[str]] = {"identifier": [], "numeric": [], "categorical": []}
     row_count = len(frame)
@@ -71,6 +71,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     parser.add_argument("--context", required=True)
     args = parser.parse_args(argv)
     context = load_context(Path(args.context))
+    # output_dir is write-only for this attempt; source inputs come from named context paths.
     output_dir = Path(context["paths"]["output_dir"])
     output_dir.mkdir(parents=True, exist_ok=True)
     payload = inspect(read_csv(context), context)
