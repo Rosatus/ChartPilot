@@ -24,6 +24,16 @@ def load_bridge(project_root: Path) -> Any:
     return module
 
 
+def load_script_contract(project_root: Path) -> Any:
+    path = project_root / "agent/tests/chart_script_contract.py"
+    spec = importlib.util.spec_from_file_location("chartpilot_chart_script_contract", path)
+    if not spec or not spec.loader:
+        raise RuntimeError("Could not load ChartPilot chart-script contract.")
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def execute(project_root: Path, case_root: Path, keep_output: bool) -> dict[str, Any]:
     input_root = case_root / "输入原csv数据"
     request = input_root / "原prompt.md"
@@ -41,6 +51,7 @@ def execute(project_root: Path, case_root: Path, keep_output: bool) -> dict[str,
         }
     )
     bridge = load_bridge(project_root)
+    script_contract = load_script_contract(project_root)
     fixtures = project_root / "agent/tests/fixtures"
     expected = json.loads((fixtures / "sy135-expected.json").read_text(encoding="utf-8"))
     task_id = f"sy135-{uuid.uuid4().hex[:8]}"
@@ -66,6 +77,14 @@ def execute(project_root: Path, case_root: Path, keep_output: bool) -> dict[str,
             (task_dir / "analysis_result.json").read_text(encoding="utf-8")
         )
         result = pd.read_csv(task_dir / "result.csv", encoding="utf-8-sig")
+        script_contract.validate_chart_intent(analysis_manifest["chart_intent"])
+        script_features = script_contract.validate_render_source(
+            (task_dir / "generated_chart.py").read_text(encoding="utf-8")
+        )
+        chart_metadata = json.loads(
+            (task_dir / "adaptive_chart.json").read_text(encoding="utf-8")
+        )
+        script_contract.validate_render_metadata(chart_metadata)
         counts = result.groupby("gear").size().sort_index().tolist()
         checks = {
             "source_rows": int(inspection["row_count"]) == expected["source_rows"],
@@ -85,6 +104,11 @@ def execute(project_root: Path, case_root: Path, keep_output: bool) -> dict[str,
                     "above_25_percent.csv",
                     "above_50_percent.csv",
                 )
+            ),
+            "chart_script_structure": all(script_features.values()),
+            "chart_archetype": (
+                analysis_manifest["chart_intent"]["archetype"]
+                == "group-risk-threshold-bubble"
             ),
         }
         with Image.open(task_dir / "chart.png") as image:

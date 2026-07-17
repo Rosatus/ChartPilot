@@ -82,9 +82,50 @@ def main() -> int:
             },
         ],
         "chart_intent": {
+            "archetype": "group-risk-threshold-bubble",
+            "match_reason": (
+                "Devices are assigned to one primary mode, compared with mode peers, "
+                "and classified by prompt thresholds with bubble reporting."
+            ),
             "report_type": "multi-panel-risk-report",
             "title": "Operating-mode consumption risk",
-            "thresholds": [1.2, 1.4],
+            "detail_grain": "one result row per device",
+            "visual_grain": "one mark per primary mode and risk band",
+            "role_map": {
+                "entity": "device_key",
+                "group": "primary_mode",
+                "metric": "mean_consumption",
+                "baseline": "peer_baseline",
+                "risk_band": "risk",
+                "weight": "sample_count",
+            },
+            "risk_order": ["baseline_or_below", "within_20", "above_20", "above_40"],
+            "thresholds": [
+                {"label": "peer baseline", "multiplier": 1.0, "color": "#2676B8"},
+                {"label": "+20%", "multiplier": 1.2, "color": "#E5A823"},
+                {"label": "+40%", "multiplier": 1.4, "color": "#D95D39"},
+            ],
+            "panels": [
+                {
+                    "id": "risk-composition",
+                    "purpose": "show device counts by primary mode and risk band",
+                    "mark": "stacked_bar",
+                    "grain": ["group", "risk_band"],
+                    "measure": "entity_count",
+                },
+                {
+                    "id": "metric-threshold-bubbles",
+                    "purpose": "show aggregate consumption, population, baseline, and thresholds",
+                    "mark": "bubble",
+                    "grain": ["group", "risk_band"],
+                    "position": ["group", "aggregate_metric"],
+                    "area": "entity_count",
+                    "color": "risk_band",
+                    "references": ["baseline", "prompt_thresholds"],
+                },
+            ],
+            "ordering": {"group": "ascending", "risk_band": "low_to_high"},
+            "annotation_strategy": "aggregate labels with a separated methodology note",
         },
     }
     (output / "adaptive_analysis.json").write_text(

@@ -98,13 +98,32 @@ Write nonempty UTF-8/UTF-8-SIG `result.csv` and `adaptive_analysis.json`:
       "evidence": [{"column": "value", "value": 10}]
     }
   ],
-  "chart_intent": {"report_type": "comparison", "title": "Example"}
+  "chart_intent": {
+    "archetype": "generic-category-comparison",
+    "match_reason": "No peer baseline or threshold bands are present.",
+    "report_type": "comparison",
+    "role_map": {"group": "category", "metric": "value"},
+    "panels": [
+      {"id": "category-comparison", "mark": "bar", "grain": ["group"]}
+    ],
+    "thresholds": [],
+    "ordering": {"group": "metric_descending"},
+    "annotation_strategy": "label only values needed for comparison"
+  }
 }
 ```
 
 `result_schema[].name` must exactly match the CSV headers in order. Finding IDs must be unique and
 every finding must include an evidence list. The bridge creates `analysis_result.json` after
-validation.
+validation. `chart_intent` is an auditable Agent plan, not an MCP-executed chart DSL. Record the
+selected archetype or free-form fallback, match reason, role-to-column mapping, panel IDs and
+marks, visual grain, thresholds, ordering, and annotation strategy. Read `visual-archetypes.md`
+when its role signature may apply; render code must implement the same plan.
+
+Record baseline weighting separately from count/volume weights. Using a weight to select an
+entity's dominant category or to size a bubble does not authorize a weighted peer baseline. When
+the request compares entities with a group average and does not specify weighting, the baseline
+uses equal entity contribution.
 
 Optional supporting files are declared in `adaptive_analysis.json`:
 
@@ -127,6 +146,8 @@ Write a valid nonblank `chart.png`, nonempty UTF-8 `summary.md`, and `adaptive_c
   "schema_version": "chartpilot.adaptive-chart/v1",
   "task_id": "T001",
   "report_type": "multi-panel-risk-report",
+  "visual_archetype": "group-risk-threshold-bubble",
+  "panel_ids": ["risk-composition", "metric-threshold-bubbles"],
   "finding_ids": ["finding-1"],
   "presentation_notes": ["Two coordinated panels"]
 }
@@ -137,6 +158,11 @@ it is nonblank and creates `chart_result.json` after validation. Matplotlib miss
 cause recoverable `RENDER_TEXT_UNREADABLE`; replacement characters in render text are rejected.
 After success, the Agent must still inspect the actual image because nonblank validation does not
 judge layout, density, overlap, or whether the visual answers the request.
+
+Before execution, review the complete generated render source against `chart_intent`. A selected
+archetype must retain its declared aggregation, panel responsibilities, marks, and reference lines.
+`visual_archetype` and `panel_ids` in `adaptive_chart.json` record what the script implemented;
+they do not replace source or image review.
 
 ## 6. Execution And Retry Rules
 

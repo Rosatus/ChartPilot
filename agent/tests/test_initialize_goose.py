@@ -60,6 +60,18 @@ class InitializeGooseTests(unittest.TestCase):
                 path.name for path in skills_root.iterdir() if path.is_dir()
             )
             self.assertEqual(skill_names, sorted(MODULE.SKILL_NAMES))
+            staged_reference = (
+                skills_root
+                / "chartpilot-run-python/references/visual-archetypes.md"
+            )
+            self.assertTrue(staged_reference.is_file())
+            self.assertEqual(
+                staged_reference.read_bytes(),
+                (
+                    PROJECT_ROOT
+                    / "skills/chartpilot-run-python/references/visual-archetypes.md"
+                ).read_bytes(),
+            )
         finally:
             shutil.rmtree(temporary, ignore_errors=True)
 

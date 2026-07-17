@@ -11,6 +11,12 @@ from pathlib import Path
 import pandas as pd
 from PIL import Image, ImageStat
 
+from chart_script_contract import (
+    validate_chart_intent,
+    validate_render_metadata,
+    validate_render_source,
+)
+
 
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FIXTURES = PROJECT_ROOT / "agent/tests/fixtures"
@@ -71,6 +77,15 @@ class AdaptiveSyntheticTests(unittest.TestCase):
             self.assertEqual(len(result), 6)
             self.assertEqual(int((result["relative_ratio"] > 1.2).sum()), 2)
             self.assertEqual(int((result["relative_ratio"] > 1.4).sum()), 1)
+            analysis = json.loads((task_dir / "analysis_result.json").read_text(encoding="utf-8"))
+            validate_chart_intent(analysis["chart_intent"])
+            render_source = (task_dir / "generated_chart.py").read_text(encoding="utf-8")
+            features = validate_render_source(render_source)
+            self.assertTrue(all(features.values()))
+            render_metadata = json.loads(
+                (task_dir / "adaptive_chart.json").read_text(encoding="utf-8")
+            )
+            validate_render_metadata(render_metadata)
             chart = json.loads((task_dir / "chart_result.json").read_text(encoding="utf-8"))
             self.assertEqual(chart["report"]["type"], "multi-panel-risk-report")
             with Image.open(task_dir / "chart.png") as image:

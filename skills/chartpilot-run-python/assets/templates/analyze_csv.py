@@ -74,6 +74,7 @@ def analyze(frame: pd.DataFrame, context: dict[str, Any]) -> tuple[pd.DataFrame,
             {"column": "row_count", "value": int(top["row_count"])},
         ]
     request = Path(context["request"]["path"]).read_text(encoding="utf-8")
+    metric_name = "value_mean" if "value_mean" in result.columns else "row_count"
     payload = {
         "schema_version": "chartpilot.adaptive-analysis/v1",
         "task_id": context["task_id"],
@@ -82,16 +83,26 @@ def analyze(frame: pd.DataFrame, context: dict[str, Any]) -> tuple[pd.DataFrame,
         "result_schema": result_schema,
         "findings": [{"id": "finding-1", "text": finding_text, "evidence": evidence}],
         "chart_intent": {
+            # EDIT: choose a reference archetype when its full role signature matches.
+            "archetype": "generic-category-comparison",
+            "match_reason": "The starter result has no peer baseline or threshold bands.",
             "report_type": "comparison",
             "title": request.strip()[:160],
             "detail_grain": "one result row per category",
             "visual_grain": "one mark per category",
-            "panel_purposes": ["compare the selected metric across categories"],
-            "encodings": {
-                "x": "category",
-                "y": "value_mean" if "value_mean" in result.columns else "row_count",
-                "weight": "row_count",
-            },
+            "role_map": {"group": "category", "metric": metric_name, "weight": "row_count"},
+            "panels": [
+                {
+                    "id": "category-comparison",
+                    "purpose": "compare the selected metric across categories",
+                    "mark": "bar",
+                    "grain": ["group"],
+                    "position": ["group", "metric"],
+                }
+            ],
+            "thresholds": [],
+            "ordering": {"group": "metric_descending"},
+            "annotation_strategy": "label only values needed for comparison",
             "density_strategy": "show the bounded category result directly",
         },
         # Add plain filenames here when this stage writes supporting CSV/JSON/Markdown/text files.

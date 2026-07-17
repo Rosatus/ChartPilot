@@ -18,6 +18,8 @@ CSV, and performs analysis and PNG rendering locally without system Python.
   through a fixed operation vocabulary.
 - Build task-specific single- or multi-panel PNG reports with matplotlib/Pillow and Chinese font
   support.
+- Match peer-baseline/threshold/bubble requests to an evidence-backed chart archetype while keeping
+  a free-form route for other analytical intents.
 - Use pinned WinPython CPython 3.13.13 Windows x64 instead of system `python` or `py.exe`.
 - Use pinned Goose Desktop 1.43.0 Windows x64 without CUDA, Node.js, Rust, or an installer.
 - Preserve exact generated source, runtime identity, bounded process output, execution status,
@@ -94,10 +96,13 @@ request.md + task_context.json + generated_inspect.py
   -> generated_chart.py + chart.png + chart_result.json + summary.md
 ```
 
-The Agent should iterate on generated code when calculations, labels, chart composition, or
+Before analysis, the Agent matches analytical roles against Skill visual archetypes. A matching
+group/peer-baseline/threshold request uses coordinated population-composition and aggregate-bubble
+panels; nonmatching requests keep a task-specific free-form plan. The Agent reviews generated
+render source against that plan, then iterates when calculations, labels, chart composition, or
 presentation do not satisfy the request. Execution responses include bounded process diagnostics;
 missing font glyphs fail render. The Agent visually inspects the actual PNG before reporting only
-committed artifacts. There is no deterministic alternate route.
+committed artifacts. There is no deterministic alternate route or fixed renderer.
 
 ## Validate and package
 

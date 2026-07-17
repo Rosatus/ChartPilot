@@ -107,10 +107,17 @@ assets/templates/analyze_csv.py
 assets/templates/render_chart.py
 references/adaptive-task-contract.md
 references/runtime-contract.md
+references/visual-archetypes.md
 ```
 
 Keep SKILL instructions concise and high-freedom. Templates are editable starting points, must run
 unchanged, and must not contain case-specific fields, thresholds, paths, or layout.
+
+The Skill owns an evidence-backed, role-matched visual-archetype reference. The only current
+archetype is `group-risk-threshold-bubble`: use it when entities belong to comparison groups,
+numeric metrics are compared with group/peer baselines, ordered threshold bands exist, and the
+report must coordinate population composition with aggregate bubble severity. Match on roles, not
+keywords or field names. Nonmatching tasks keep a reasoned free-form plan.
 
 #### Task Preparation
 
@@ -160,6 +167,17 @@ that does not answer the request.
 
 The bridge does not validate business correctness. Prompt-specific tests and Agent reasoning own
 field mapping, calculations, thresholds, findings, and visual design.
+
+Generated analysis code records archetype/fallback, match reason, role map, panel grain/marks,
+thresholds, ordering, and annotation strategy in `chart_intent`. Generated render code must
+implement that plan and record the archetype plus panel IDs in `adaptive_chart.json`. These fields
+are auditable Agent planning data, not an MCP-executed DSL. Review the complete render source before
+execution; image review is a second gate and cannot approve a different chart family.
+
+Baseline population grain and volume weights are independent contracts. A count used for dominant
+group selection, record-volume reporting, or bubble area must not silently weight a peer baseline.
+For entity-to-group comparisons, use equal entity contribution unless the prompt explicitly
+requests or defines weighting, and record a different decision in assumptions.
 
 #### Risk Posture
 
@@ -212,13 +230,18 @@ after all outputs validate.
 - Contract: MCP `tools/list` returns exactly the two signatures above; Goose stages exactly one
   product Skill and cleans stale removed Skill directories.
 - Template: all three templates pass `--help`, run unchanged on the minimal contract, and can be
-  customized for the anonymous changed-schema/threshold fixture.
+  customized for the anonymous changed-schema/threshold fixture. The unchanged analysis template
+  declares a generic comparison fallback, while the anonymous peer-baseline/threshold fixture
+  selects `group-risk-threshold-bubble`.
 - End to end: the external SY135 case asserts 59,278 source rows, 6,523 machines, exact gear
   totals, 96 above 25%, zero above 50%, committed auxiliary files, two populated chart regions,
-  and no render stderr warnings. Forward-test the product Skill with Goose and verify `read_image`
-  is called before completion when provider state permits.
+  no render stderr warnings, and generated source containing group-risk aggregation, stacked
+  composition, aggregate bubbles, and baseline/threshold references. Forward-test the product
+  Skill with Goose and verify source review plus `read_image` occur before completion when provider
+  state permits.
 - Release: assert `pip check`, imports, locks, licenses, two Skill copies, six template copies,
-  zero removed Skill entries, and zero forbidden metadata/cache entries.
+  both visual-archetype reference copies, zero removed Skill entries, and zero forbidden
+  metadata/cache entries.
 
 ### 7. Wrong vs Correct
 

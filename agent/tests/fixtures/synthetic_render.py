@@ -11,7 +11,6 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 
-RISK_ORDER = ["baseline_or_below", "within_20", "above_20", "above_40"]
 COLORS = ["#79B6D2", "#B7D43A", "#F2B134", "#D95D39"]
 
 
@@ -21,16 +20,25 @@ def main() -> int:
     context = json.loads(Path(parser.parse_args().context).read_text(encoding="utf-8"))
     result = pd.read_csv(context["paths"]["result_csv"], encoding="utf-8-sig")
     analysis = json.loads(Path(context["paths"]["analysis_result"]).read_text(encoding="utf-8"))
+    intent = analysis["chart_intent"]
     output = Path(context["paths"]["output_dir"])
     modes = sorted(result["primary_mode"].unique())
+    risk_order = intent["risk_order"]
+    summary = result.groupby(["primary_mode", "risk"], as_index=False).agg(
+        entity_count=("device_key", "nunique"),
+        aggregate_metric=("mean_consumption", "mean"),
+        peer_baseline=("peer_baseline", "first"),
+    )
     counts = (
-        result.groupby(["primary_mode", "risk"]).size().unstack(fill_value=0).reindex(
-            index=modes, columns=RISK_ORDER, fill_value=0
+        summary.pivot_table(
+            index="primary_mode", columns="risk", values="entity_count", aggfunc="sum", fill_value=0
+        ).reindex(
+            index=modes, columns=risk_order, fill_value=0
         )
     )
     figure, (top, bottom) = plt.subplots(2, 1, figsize=(16, 10), constrained_layout=True)
     base = pd.Series(0, index=modes, dtype=float)
-    for risk, color in zip(RISK_ORDER, COLORS):
+    for risk, color in zip(risk_order, COLORS):
         top.bar(modes, counts[risk], bottom=base, label=risk, color=color)
         base += counts[risk]
     top.set_title("Risk distribution by selected operating mode")
@@ -39,15 +47,20 @@ def main() -> int:
     top.grid(axis="y", color="#D9DEE2")
 
     baseline = result.groupby("primary_mode")["peer_baseline"].first().reindex(modes)
-    bottom.plot(modes, baseline, "--", label="peer baseline", color="#2676B8")
-    bottom.plot(modes, baseline * 1.2, "--", label="+20%", color="#E5A823")
-    bottom.plot(modes, baseline * 1.4, "--", label="+40%", color="#D95D39")
-    for risk, color in zip(RISK_ORDER, COLORS):
-        subset = result[result["risk"] == risk]
+    for threshold in intent["thresholds"]:
+        bottom.plot(
+            modes,
+            baseline * float(threshold["multiplier"]),
+            "--",
+            label=str(threshold["label"]),
+            color=str(threshold["color"]),
+        )
+    for risk, color in zip(risk_order, COLORS):
+        subset = summary[summary["risk"] == risk]
         bottom.scatter(
             subset["primary_mode"],
-            subset["mean_consumption"],
-            s=subset["sample_count"] * 1.2,
+            subset["aggregate_metric"],
+            s=45 + subset["entity_count"] * 90,
             color=color,
             edgecolor="#222222",
             alpha=0.85,
@@ -67,6 +80,8 @@ def main() -> int:
         "schema_version": "chartpilot.adaptive-chart/v1",
         "task_id": context["task_id"],
         "report_type": "multi-panel-risk-report",
+        "visual_archetype": intent["archetype"],
+        "panel_ids": [item["id"] for item in intent["panels"]],
         "finding_ids": [finding["id"] for finding in analysis["findings"]],
         "presentation_notes": [
             "Top panel shows population by risk.",

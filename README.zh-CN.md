@@ -15,6 +15,7 @@ ChartPilot 是一个基于 Goose Desktop 的 Windows 本地优先 CSV 分析 Age
 - 从精简的 inspect、analysis、render 模板起步，按真实字段、业务口径、阈值和呈现要求修改。
 - 使用 pandas/numpy 直接完成嵌套分组、同群基准、风险分类等任务，不套固定操作词表。
 - 使用 matplotlib/Pillow 生成任务特定的单图或多区域 PNG 报告，并支持中文字体。
+- 对同群基准、阈值分级和气泡规模类请求复用经过验证的图表原型，其他分析意图仍自由生成。
 - 使用固定的 WinPython CPython 3.13.13 Windows x64，不调用系统 `python` 或 `py.exe`。
 - 使用固定的 Goose Desktop 1.43.0 Windows x64 无 CUDA 版本，不要求 Node.js、Rust 或安装程序。
 - 保存完整生成代码、运行时身份、受限进程输出、执行状态、产物哈希和任务结果。
@@ -87,9 +88,11 @@ request.md + task_context.json + generated_inspect.py
   -> generated_chart.py + chart.png + chart_result.json + summary.md
 ```
 
-执行响应包含有界进程诊断，中文缺字会使 render 失败。Agent 必须实际读取最终 PNG，若计算、
-密度、重叠、标签或图表组合不符合需求则修改代码并重试，最后只报告已提交产物。系统不存在
-确定性备用路由。
+Analysis 前，Agent 会按实体、分组、指标、同群基准和阈值等语义角色匹配 Skill 图表原型。
+匹配的同群风险请求采用“数量构成 + 聚合气泡/基准阈值”协同面板；不匹配的请求继续使用任务
+特定自由方案。Agent 先核对生成 render 源码是否实现该计划，再实际读取最终 PNG；若计算、
+密度、重叠、标签或图表组合不符合需求则修改代码并重试，最后只报告已提交产物。执行响应
+包含有界进程诊断，中文缺字会使 render 失败。系统不存在确定性备用路由或固定渲染器。
 
 ## 验证与打包
 

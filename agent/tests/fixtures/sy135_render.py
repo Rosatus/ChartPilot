@@ -13,7 +13,6 @@ import pandas as pd
 from matplotlib import font_manager
 
 
-RISK_ORDER = ["低风险", "中低风险", "中高风险", "高风险", "极致高风险"]
 COLORS = ["#7FC4E2", "#CDE52B", "#FFBC12", "#FF6232", "#9C2AB7"]
 
 
@@ -46,8 +45,10 @@ def main() -> int:
     context = json.loads(Path(parser.parse_args().context).read_text(encoding="utf-8"))
     result = pd.read_csv(context["paths"]["result_csv"], encoding="utf-8-sig")
     analysis = json.loads(Path(context["paths"]["analysis_result"]).read_text(encoding="utf-8"))
+    intent = analysis["chart_intent"]
     output = Path(context["paths"]["output_dir"])
     gears = sorted(result["gear"].unique())
+    risk_order = intent["risk_order"]
     selected_font = font()
 
     figure = plt.figure(figsize=(18, 12), constrained_layout=True)
@@ -57,10 +58,10 @@ def main() -> int:
     note = figure.add_subplot(grid[:, 1])
 
     counts = result.groupby(["gear", "risk"]).size().unstack(fill_value=0).reindex(
-        index=gears, columns=RISK_ORDER, fill_value=0
+        index=gears, columns=risk_order, fill_value=0
     )
     base = pd.Series(0, index=gears, dtype=float)
-    for risk, color in zip(RISK_ORDER, COLORS):
+    for risk, color in zip(risk_order, COLORS):
         values = counts[risk]
         bars = top.bar(gears, values, bottom=base, label=risk, color=color, width=0.65)
         for bar, value, offset in zip(bars, values, base):
@@ -88,17 +89,19 @@ def main() -> int:
     bottom.fill_between(gears, baselines, baselines * 1.25, color="#F6F9DB", alpha=0.7)
     bottom.fill_between(gears, baselines * 1.25, baselines * 1.50, color="#FFF0D9", alpha=0.7)
     bottom.fill_between(gears, baselines * 1.50, baselines * 2.0, color="#F6E8F8", alpha=0.6)
-    for multiplier, label, color in (
-        (1.0, "基准线", "#2676B8"),
-        (1.25, "+25%线", "#E5A823"),
-        (1.50, "+50%线", "#F07A24"),
-        (1.75, "+75%线", "#D4483B"),
-    ):
-        bottom.plot(gears, baselines * multiplier, "--", label=label, color=color, linewidth=1.2)
+    for threshold in intent["thresholds"]:
+        bottom.plot(
+            gears,
+            baselines * float(threshold["multiplier"]),
+            "--",
+            label=str(threshold["label"]),
+            color=str(threshold["color"]),
+            linewidth=1.2,
+        )
     summary = result.groupby(["gear", "risk"], as_index=False).agg(
         mean_fuel=("mean_fuel", "mean"), machine_count=("login_id", "size")
     )
-    for risk, color in zip(RISK_ORDER, COLORS):
+    for risk, color in zip(risk_order, COLORS):
         subset = summary[summary["risk"] == risk]
         bottom.scatter(
             subset["gear"],
@@ -151,6 +154,8 @@ def main() -> int:
         "schema_version": "chartpilot.adaptive-chart/v1",
         "task_id": context["task_id"],
         "report_type": "multi-panel-risk-report",
+        "visual_archetype": intent["archetype"],
+        "panel_ids": [item["id"] for item in intent["panels"]],
         "finding_ids": [finding["id"] for finding in analysis["findings"]],
         "presentation_notes": [
             "上半区展示各主档位风险等级数量。",

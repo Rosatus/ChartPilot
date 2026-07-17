@@ -120,21 +120,51 @@ def main() -> int:
             },
         ],
         "chart_intent": {
+            "archetype": "group-risk-threshold-bubble",
+            "match_reason": (
+                "Machines are assigned to one dominant gear, compared with same-gear peers, "
+                "and classified by threshold bands with bubble reporting."
+            ),
             "report_type": "multi-panel-risk-report",
             "title": "SY135I4 主档位油耗风险分析",
-            "thresholds": [1.25, 1.50, 1.75],
             "detail_grain": "one row per machine",
             "visual_grain": "one mark per gear and risk band",
-            "panel_purposes": [
-                "compare population composition by gear and risk band",
-                "compare aggregated fuel severity against gear thresholds",
-            ],
-            "encodings": {
-                "x": "gear",
-                "y": "mean_fuel",
-                "area": "machine_count",
-                "color": "risk",
+            "role_map": {
+                "entity": "login_id",
+                "group": "gear",
+                "metric": "mean_fuel",
+                "baseline": "gear_baseline",
+                "risk_band": "risk",
+                "weight": "sample_count",
             },
+            "risk_order": ["低风险", "中低风险", "中高风险", "高风险", "极致高风险"],
+            "thresholds": [
+                {"label": "基准线", "multiplier": 1.0, "color": "#2676B8"},
+                {"label": "+25%线", "multiplier": 1.25, "color": "#E5A823"},
+                {"label": "+50%线", "multiplier": 1.5, "color": "#F07A24"},
+                {"label": "+75%线", "multiplier": 1.75, "color": "#D4483B"},
+            ],
+            "panels": [
+                {
+                    "id": "risk-composition",
+                    "purpose": "compare machine counts by gear and risk band",
+                    "mark": "stacked_bar",
+                    "grain": ["group", "risk_band"],
+                    "measure": "entity_count",
+                },
+                {
+                    "id": "metric-threshold-bubbles",
+                    "purpose": "compare aggregate fuel, population, baseline, and thresholds",
+                    "mark": "bubble",
+                    "grain": ["group", "risk_band"],
+                    "position": ["group", "aggregate_metric"],
+                    "area": "entity_count",
+                    "color": "risk_band",
+                    "references": ["baseline", "prompt_thresholds"],
+                },
+            ],
+            "ordering": {"group": "ascending", "risk_band": "low_to_high"},
+            "annotation_strategy": "aggregate labels with a separated methodology note",
             "density_strategy": "aggregate machine detail by gear and risk band for rendering",
         },
         "artifacts": [

@@ -1,4 +1,4 @@
 interface:
   display_name: "ChartPilot Adaptive CSV"
-  short_description: "Adapt Python templates into a task-specific CSV report"
-  default_prompt: "Use $chartpilot-run-python to inspect this CSV, choose a decision-ready visual grain, write task-specific analysis and rendering code, run it with bundled WinPython, visually inspect the actual chart, and return only committed artifacts and supported findings."
+  short_description: "Role-matched CSV reports with adaptable Python"
+  default_prompt: "Use $chartpilot-run-python to inspect this CSV, select a role-matched visual archetype, write task-specific analysis and render Python, run it with bundled WinPython, review the generated source and chart, and return committed artifacts."

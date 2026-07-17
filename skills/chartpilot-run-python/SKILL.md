@@ -41,12 +41,24 @@ Use `inspection.json` as evidence, then decide the entity, dimensions, weights, 
 comparisons, thresholds, and required visual explanation. Do not force the request into a fixed
 aggregation vocabulary.
 
+Before writing analysis code, perform an archetype-selection pass. When the task combines an
+entity-to-group assignment, a peer/group baseline, ordered threshold bands, population size, and
+bubble or aggregate-severity reporting, read
+[references/visual-archetypes.md](references/visual-archetypes.md). Select its matching archetype
+or record a concrete reason that the match signature is not satisfied. Do not route from keywords
+or field names.
+
 Before analysis, explicitly separate:
 
 - source row grain and analytical entity;
 - detail-output grain for auditing;
 - visual grain for comparison;
 - metric, baseline, weight, thresholds, tie policy, and missing/invalid-value policy.
+
+Keep the baseline population unit separate from record/volume weights. A weight used to choose an
+entity's dominant group or scale bubble area does not imply a weighted peer baseline. When the
+request compares entities with their group average and does not explicitly request weighting,
+compute that baseline at equal entity grain; document any different weighting decision.
 
 Detail and visual grain often differ. Thousands of entity rows may belong in `result.csv` while a
 chart uses category/risk aggregates. Entity-level marks are still valid when the request truly
@@ -55,9 +67,7 @@ needs individual exceptions and the result remains readable.
 Finding or exporting exceptional entities does not imply plotting every entity. Put auditable
 exception rows in a declared CSV. If entity marks merge into opaque columns/blocks even with
 transparency, the primary view must aggregate to a decision-ready grain; an entity view may remain
-as a smaller exception-focused panel. For peer-baseline/threshold questions, a useful but optional
-pattern is a population-composition panel plus an aggregate metric/threshold panel, with bubble
-area encoding group size.
+as a smaller exception-focused panel.
 
 ## Analyze
 
@@ -73,7 +83,10 @@ faithfully answer the request.
 When the task needs extra baselines, exception lists, or supporting tables, write them during the
 analysis stage and list their plain filenames in `adaptive_analysis.json.artifacts`. Only declared
 artifacts are committed; temporary unlisted files are discarded. Make `chart_intent` describe what
-each panel answers, what one mark represents, and how position, area, and color are encoded.
+each panel answers, what one mark represents, and how position, area, and color are encoded. Record
+the selected archetype or free-form fallback, match reason, role map, panel grain/marks, ordering,
+threshold plan, and annotation strategy before render. Render must implement this plan rather than
+inventing a different visual story.
 
 ## Render
 
@@ -90,6 +103,12 @@ ignore.
 Write `chart.png`, `summary.md`, and `adaptive_chart.json`, then run stage `render`. Inspect the
 result and iterate when labels overlap, text is unreadable, important groups are hidden, or the
 visual does not support the findings.
+
+Before submitting render source, compare the complete Python with `chart_intent`. For a selected
+archetype, apply its source-review checklist and reject code whose primary aggregation, panels,
+marks, or reference lines differ from the declared plan. Record the archetype and implemented panel
+IDs in `adaptive_chart.json` for audit. Source review comes before image review; a good-looking PNG
+does not excuse the wrong chart family.
 
 After the bridge accepts the PNG, use the available image-reading tool to inspect the actual
 `chart.png`. The bridge's nonblank check verifies transport, not visual quality. Do not mark the

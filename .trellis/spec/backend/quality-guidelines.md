@@ -21,6 +21,8 @@ Changes must preserve the contracts in `runtime-guidelines.md`, especially:
 - exactly one product Skill: `chartpilot-run-python`;
 - exactly two ChartPilot MCP tools;
 - editable inspect/analyze/render templates;
+- role-matched visual archetypes remain advisory source blueprints, with a generic fallback rather
+  than a deterministic chart router;
 - task code executed only by bundled WinPython;
 - no deterministic simple-task route or hidden system shell fallback;
 - locks, hashes, licenses, and release inventory kept in sync.
@@ -69,6 +71,8 @@ for required and forbidden paths. Always run `git diff --check` before committin
 - Does the test fail if the new behavior is removed, or is it tautological?
 - Are machine-specific paths, secrets, runtime binaries, caches, and external user data excluded?
 - Does the release still work without system Python or network-time installation?
+- For a selected visual archetype, does generated source implement the declared aggregation,
+  panels, marks, and reference lines before image-level review?
 
 ## Forbidden Patterns
 

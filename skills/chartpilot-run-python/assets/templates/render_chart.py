@@ -47,7 +47,8 @@ def render(
     output_dir: Path,
     font: font_manager.FontProperties,
 ) -> dict[str, Any]:
-    """EDIT: build the report; keep global font setup and choose a readable visual grain."""
+    """EDIT: implement analysis.chart_intent; keep font setup and its declared visual story."""
+    intent = analysis["chart_intent"]
     numeric = [name for name in frame.columns if pd.api.types.is_numeric_dtype(frame[name])]
     if not numeric:
         raise ValueError("The starter renderer needs at least one numeric result column.")
@@ -56,7 +57,7 @@ def render(
     plot = frame.head(30)
     figure, axis = plt.subplots(figsize=(16, 9), constrained_layout=True)
     axis.bar(plot[x_name].astype(str), plot[y_name], color="#2F6B7C")
-    axis.set_title(str(analysis["chart_intent"].get("title", "ChartPilot report")), fontproperties=font)
+    axis.set_title(str(intent.get("title", "ChartPilot report")), fontproperties=font)
     axis.set_xlabel(str(x_name), fontproperties=font)
     axis.set_ylabel(str(y_name), fontproperties=font)
     axis.grid(axis="y", color="#D9DEE2", linewidth=0.8)
@@ -67,6 +68,8 @@ def render(
     plt.close(figure)
     return {
         "report_type": "adaptive-comparison",
+        "archetype": str(intent.get("archetype", "free-form")),
+        "panel_ids": [str(item.get("id")) for item in intent.get("panels", []) if item.get("id")],
         "presentation_notes": ["The unchanged starter template rendered the first numeric metric."],
     }
 
@@ -89,6 +92,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "schema_version": "chartpilot.adaptive-chart/v1",
         "task_id": context["task_id"],
         "report_type": metadata["report_type"],
+        "visual_archetype": metadata["archetype"],
+        "panel_ids": metadata["panel_ids"],
         "finding_ids": [str(item["id"]) for item in findings],
         "presentation_notes": metadata.get("presentation_notes", []),
     }

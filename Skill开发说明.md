@@ -30,6 +30,7 @@ chartpilot-run-python/
   references/
     adaptive-task-contract.md
     runtime-contract.md
+    visual-archetypes.md
 ```
 
 `SKILL.md` 只保留决策流程和工具顺序；详细 JSON 契约放在 `references/`；供 Agent 复制、
@@ -89,6 +90,16 @@ Agent 不应机械保留模板逻辑。遇到嵌套分组、主类别选择、�
 后者包含问题、假设、与 CSV 表头一致的 result schema、带 evidence 的 findings 和 chart
 intent。MCP 验证后生成 `analysis_result.json`；所有业务计算由生成代码负责。
 
+Agent 在 analysis 代码生成前按语义角色选择图表原型。当前只提供经过人工基准验证的
+`group-risk-threshold-bubble`：实体归入比较组、指标与同群基准比较并形成有序阈值带，且需要
+同时表达对象数量构成和聚合指标严重程度时，上图使用分组风险数量堆叠，下图使用分组风险聚合
+气泡并叠加基准/阈值。匹配依据、字段角色、面板粒度、阈值、排序和注释策略写入
+`chart_intent`。不满足完整角色签名时保留自由方案并说明原因，不能按关键词或字段名路由。
+
+基准统计单位与规模权重必须分开决策。用于选择主类别、表示记录规模或缩放气泡的权重，不得
+自动用于同群基准；当需求比较“每个实体与同组平均”且未明确要求加权时，同群基准按实体
+等权计算，采用其他权重时必须写入假设。
+
 任务需要档位基线、异常清单或说明文件时，可在 `adaptive_analysis.json.artifacts` 中声明
 纯文件名的 UTF-8 CSV/JSON/Markdown/text 辅助产物。只有声明且验证通过的文件会与标准产物
 一起提交、哈希并写入 manifest；未声明的 staging 文件会丢弃。
@@ -101,7 +112,9 @@ intent。MCP 验证后生成 `analysis_result.json`；所有业务计算由生�
 - `summary.md`
 - `adaptive_chart.json`
 
-Agent 可以自由使用单图或多区域布局。MCP 检查 PNG 签名、尺寸、文件大小和前景像素；
+Agent 可以自由使用单图或多区域布局。生成源码执行前必须与 `chart_intent` 核对；选择原型时，
+主聚合、面板职责、mark 和参考线必须与原型一致，并把原型和面板 ID 写入渲染元数据。MCP
+检查 PNG 签名、尺寸、文件大小和前景像素；
 Matplotlib 缺字警告和文本替换字符会使阶段失败。生成 `chart_result.json` 后，Agent 仍须
 实际读取图片，检查过绘制、标题/图例/标注碰撞、裁切和业务表达，必要时修改 render 重试。
 
@@ -147,5 +160,7 @@ runtime\winpython\python\python.exe -I `
 - Goose portable 状态只发现一个产品 Skill；
 - 三份模板可原样运行；
 - 匿名变化字段/阈值用例能通过修改模板生成双区域图；
+- 匿名用例与 SY135 用例的生成脚本均通过原型、分组风险聚合、堆叠构成、聚合气泡和阈值
+  参考线检查；普通模板冒烟不得误选该风险原型；
 - SY135 外部案例得到 6,523 台、指定档位分布、96 台高于 25%、0 台高于 50%；
 - 发布 ZIP 不包含已删除 Skills、旧工具、项目元数据或用户 workspace。
